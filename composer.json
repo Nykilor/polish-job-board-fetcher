@@ -1,0 +1,21 @@
+{
+    "name": "nykilor/polish-job-board-fetcher",
+    "description": "Web scraps and makes api calls to polish job board websites.",
+    "type": "library",
+    "require": {
+        "guzzlehttp/guzzle": "~6.0"
+    },
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Marmolada",
+            "email": "smigi1997@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "autoload": {
+        "psr-4": {
+            "PolishJobBoardFetcher\\": "app/lib/PolishJobBoardFetcher"
+        }
+    }
+}
