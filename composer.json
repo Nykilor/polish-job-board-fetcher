@@ -3,7 +3,9 @@
     "description": "Web scraps and makes api calls to polish job board websites.",
     "type": "library",
     "require": {
-        "guzzlehttp/guzzle": "~6.0"
+        "guzzlehttp/guzzle": "~6.0",
+        "symfony/dom-crawler": "^5.0@dev",
+        "symfony/css-selector": "^5.0@dev"
     },
     "license": "MIT",
     "authors": [

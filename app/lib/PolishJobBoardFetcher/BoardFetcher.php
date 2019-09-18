@@ -5,7 +5,7 @@ use GuzzleHttp\Client;
 
 use PolishJobBoardFetcher\Website\WebsiteInterface;
 
-use PolishJobBoardFetcher\Model\JobOfferCollection;
+use PolishJobBoardFetcher\Model\Collection\JobOfferCollection;
 
 /**
  * The main class to fetch the data with

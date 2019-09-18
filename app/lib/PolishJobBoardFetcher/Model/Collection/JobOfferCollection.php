@@ -1,10 +1,12 @@
 <?php
-namespace PolishJobBoardFetcher\Model;
+namespace PolishJobBoardFetcher\Model\Collection;
 
 use Iterator;
 use Countable;
 use ArrayAccess;
 use JsonSerializable;
+
+use PolishJobBoardFetcher\Model\JobOffer;
 
 /**
  * A collection class for JobOffers
@@ -95,11 +97,5 @@ class JobOfferCollection implements Countable, JsonSerializable, Iterator, Array
     public function jsonSerialize()
     {
         return $this->items;
-        // $array = [];
-        // if (!empty($this->items)) {
-        //     foreach ($this->items as $position => $model) {
-        //         $array[] = $model->jsonSerialize();
-        //     }
-        // }
     }
 }

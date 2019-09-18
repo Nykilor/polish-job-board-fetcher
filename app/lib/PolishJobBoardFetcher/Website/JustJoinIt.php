@@ -7,7 +7,7 @@ use DateTime;
 use GuzzleHttp\Client;
 
 use PolishJobBoardFetcher\Model\JobOffer;
-use PolishJobBoardFetcher\Model\JobOfferCollection;
+use PolishJobBoardFetcher\Model\Collection\JobOfferCollection;
 
 /**
  * JustJoin.it API call class
@@ -30,7 +30,7 @@ class JustJoinIt implements WebsiteInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, string $technology, string $city, string $exp)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp)
     {
         $response = $client->request("GET", self::URL."api/offers");
         $body = $response->getBody()->getContents();
@@ -50,7 +50,7 @@ class JustJoinIt implements WebsiteInterface
      * @param  array    $entry_data Single offer
      * @return JobOffer
      */
-    public function createJobOfferModel(array $entry_data) : JobOffer
+    private function createJobOfferModel(array $entry_data) : JobOffer
     {
         $offer = new JobOffer();
         $offer->setTitle($entry_data["title"]);
@@ -64,6 +64,14 @@ class JustJoinIt implements WebsiteInterface
         $offer->setUrl(self::URL."offers/".$entry_data["id"]);
         $offer->setCity($entry_data["city"]);
         $offer->setPostTime(new DateTime($entry_data["published_at"]));
+        $offer->setCompany($entry_data["company_name"]);
+
+        if (!is_null($entry_data["salary_from"])) {
+            $salary = $entry_data["salary_from"]." - ".$entry_data["salary_to"]." ".$entry_data["salary_currency"];
+        } else {
+            $salary = "";
+        }
+        $offer->setSalary($salary);
 
         return $offer;
     }
@@ -75,7 +83,7 @@ class JustJoinIt implements WebsiteInterface
      * @param  string $city       City f.i. "Poznań"
      * @param  string $exp        Experience f.i. "Junior"
      */
-    private function handleFetchResponse(array $body, string $technology, string $city, string $exp) : void
+    private function handleFetchResponse(array $body, ?string $technology, ?string $city, ?string $exp) : void
     {
         //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs
         foreach ($body as $key => $offer_array) {

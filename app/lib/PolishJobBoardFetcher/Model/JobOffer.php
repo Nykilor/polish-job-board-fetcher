@@ -32,12 +32,22 @@ class JobOffer implements JsonSerializable
      * @var \DateTime
      */
     private $postTime;
+
+    /**
+     * @var string
+     */
+    private $company;
+
+    /**
+     * @var string
+     */
+    private $salary;
+
     /**
      * Get the value of Title
      *
      * @return string
      */
-
     public function getTitle()
     {
         return $this->title;
@@ -162,6 +172,8 @@ class JobOffer implements JsonSerializable
           "city" => $this->getCity(),
           "url" => $this->getUrl(),
           "postTime" => $this->getPostTime(),
+          "company" => $this->getCompany(),
+          "salary" => $this->getSalary()
       ];
     }
 
@@ -185,6 +197,54 @@ class JobOffer implements JsonSerializable
     public function setExp($exp)
     {
         $this->exp = $exp;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of Salary
+     *
+     * @return string
+     */
+    public function getSalary()
+    {
+        return $this->salary;
+    }
+
+    /**
+     * Set the value of Salary
+     *
+     * @param string salary
+     *
+     * @return self
+     */
+    public function setSalary($salary)
+    {
+        $this->salary = $salary;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of Company
+     *
+     * @return string
+     */
+    public function getCompany()
+    {
+        return $this->company;
+    }
+
+    /**
+     * Set the value of Company
+     *
+     * @param string company
+     *
+     * @return self
+     */
+    public function setCompany($company)
+    {
+        $this->company = $company;
 
         return $this;
     }
