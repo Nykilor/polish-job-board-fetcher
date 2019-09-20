@@ -1,12 +1,12 @@
 <?php
-namespace PolishJobBoardFetcher\Model\Collection;
+namespace PolishItJobBoardFetcher\Model\Collection;
 
 use Iterator;
 use Countable;
 use ArrayAccess;
 use JsonSerializable;
 
-use PolishJobBoardFetcher\Model\JobOffer;
+use PolishItJobBoardFetcher\Model\JobOffer;
 
 /**
  * A collection class for JobOffers

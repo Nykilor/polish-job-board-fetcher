@@ -1,0 +1,203 @@
+<?php
+
+namespace PolishItJobBoardFetcher\Website;
+
+use DateTime;
+
+use GuzzleHttp\Client;
+
+use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
+use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
+
+use PolishItJobBoardFetcher\Model\Url;
+
+use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
+use PolishItJobBoardFetcher\Utility\WebsiteLoopFilterTrait;
+
+/**
+ * JustJoin.it API call class
+ */
+class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
+{
+    use JobOfferFactoryTrait;
+    use WebsiteLoopFilterTrait;
+
+    public const URL = "https://justjoin.it/";
+
+    public const TECHNOLOGY = [
+      "js", "html", "php",
+      "ruby", "python", "java",
+      ".net", "scala", "c",
+      "mobile", "devops",
+      "ui", "pm", "game",
+      "blockchain", "security",
+      "data", "golang", "sap",
+      "other"
+    ];
+
+    public const CITY = [
+      "warszawa", "kraków", "wrocław",
+      "poznań", "trójmiasto", "sopot",
+      "gdynia", "gdańsk", "remote",
+      "world", "białystok", "bielsko-biała",
+      "bydgoszcz", "częstochowa", "gliwice",
+      "katowice", "kielce", "lublin",
+      "łódź", "olsztyn", "opole",
+      "toruń", "rzeszów", "szczecin"
+    ];
+    //TODO SOME OF THE "SKILL/TECHNOLOGIES" got to go here.
+    public const CATEGORY = false;
+
+    public const EXPERIENCE = [
+        "junior",
+        "mid" => [
+          "regular", "medium"
+        ],
+        "senior" => [
+          "specjalista",
+          "specialist"
+        ]
+    ];
+
+    /**
+     * Array containing the JobOffers made from the data fetched.
+     * @var JobOfferCollection
+     */
+    private $offers;
+
+
+    public function __construct()
+    {
+        $this->offers = new JobOfferCollection();
+    }
+
+    public function hasTechnology(?string $technology) : bool
+    {
+        if (!is_null($technology) && in_array(strtolower($technology), self::TECHNOLOGY)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public function allowsCustomTechnology() : bool
+    {
+        return false;
+    }
+
+    public function hasCategory(?string $category) : bool
+    {
+        return false;
+    }
+
+    public function allowsCustomCategory() : bool
+    {
+        return false;
+    }
+
+    public function hasCity(?string $city) : bool
+    {
+        if (!is_null($city) && in_array(strtolower($city), self::CITY)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public function allowsCustomCity() : bool
+    {
+        return false;
+    }
+
+    public function hasExperience(?string $exp) : bool
+    {
+        return $this->constArrayContains(self::EXPERIENCE, $exp);
+    }
+
+    public function allowsCustomExperience() : bool
+    {
+        return false;
+    }
+
+    /**
+     * Implementation of the WebsiteInterface
+     */
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
+    {
+        $response = $client->request("GET", self::URL."api/offers");
+        $body = $response->getBody()->getContents();
+        $this->handleFetchResponse(json_decode($body, true), $technology, $city, $exp);
+    }
+
+    /**
+     * Implementation of the WebsiteInterface
+     */
+    public function getJobOfferCollection() : JobOfferCollection
+    {
+        return $this->offers;
+    }
+
+    /**
+     * Implementation of JobOfferFactoryInterface
+     */
+    public function adaptFetchedDataForModelCreation($entry_data) : array
+    {
+        $array = [];
+        $array["title"] = $entry_data["title"];
+
+        $array["technology"] = array_map(function ($entry) {
+            return $entry["name"];
+        }, $entry_data["skills"]);
+        $city = ($entry_data["remote"]) ? "Remote" : $entry_data["city"];
+
+        $url_job = new Url();
+        $url_job->setUrl(self::URL."offers/".$entry_data["id"]);
+        $url_job->setTitle("offer");
+        $url_job->setCity($city);
+
+        $url_company = new Url();
+        $url_company->setUrl($entry_data["company_url"]);
+        $url_company->setTitle("company_homepage");
+
+        $url_collection_model = new UrlCollection();
+        $url_collection_model->addItem($url_job);
+        $url_collection_model->addItem($url_company);
+
+        $array["exp"] = $entry_data["experience_level"];
+        $array["url"] = $url_collection_model;
+        $array["city"] = $city;
+        $array["post_time"] = new DateTime($entry_data["published_at"]);
+        $array["company"] = $entry_data["company_name"];
+
+        if (!is_null($entry_data["salary_from"])) {
+            $salary = $entry_data["salary_from"]." - ".$entry_data["salary_to"]." ".$entry_data["salary_currency"];
+        } else {
+            $salary = "";
+        }
+        $array["salary"] = $salary;
+
+        return $array;
+    }
+
+    /**
+     * Filter fetched offers $by variables and adds it to $this->offers
+     * @param  array  $body       Fetch body.
+     * @param  string|null $technology Technology f.i. "php"
+     * @param  string|null $city       City f.i. "Poznań"
+     * @param  string|null $exp        Experience f.i. "Junior"
+     */
+    private function handleFetchResponse(array $body, ?string $technology, ?string $city, ?string $exp) : void
+    {
+        //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs,
+        //It dosn't have the category so we don't use it.
+        foreach ($body as $key => $offer_array) {
+            if (is_null($city) or strtolower($city) === strtolower($offer_array["city"]) or ($city === "remote" && $offer_array["remote"])) {
+                if (is_null($exp) or strtolower($exp) === strtolower($offer_array["experience_level"])) {
+                    if (is_null($technology) or strtolower($technology) === strtolower($offer_array["marker_icon"])) {
+                        $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer_array));
+                    }
+                }
+            }
+        }
+    }
+}

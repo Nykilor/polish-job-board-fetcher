@@ -1,5 +1,8 @@
 <?php
-namespace PolishJobBoardFetcher\Model;
+namespace PolishItJobBoardFetcher\Model;
+
+use PolishItJobBoardFetcher\Model\Url;
+use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 
 use JsonSerializable;
 
@@ -25,7 +28,7 @@ class JobOffer implements JsonSerializable
      */
     private $city;
     /**
-     * @var string
+     * @var UrlCollection
      */
     private $url;
     /**
@@ -44,6 +47,15 @@ class JobOffer implements JsonSerializable
     private $salary;
 
     /**
+     * Implementation of JsonSerializable
+     * @return array Array with all variables of the class.
+     */
+    public function jsonSerialize() : array
+    {
+        return get_object_vars($this);
+    }
+
+    /**
      * Get the value of Title
      *
      * @return string
@@ -60,9 +72,33 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setTitle($title)
+    public function setTitle(string $title)
     {
         $this->title = $title;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of Exp
+     *
+     * @return string
+     */
+    public function getExp()
+    {
+        return $this->exp;
+    }
+
+    /**
+     * Set the value of Exp
+     *
+     * @param string exp
+     *
+     * @return self
+     */
+    public function setExp($exp)
+    {
+        $this->exp = $exp;
 
         return $this;
     }
@@ -108,7 +144,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setCity($city)
+    public function setCity(string $city)
     {
         $this->city = $city;
 
@@ -118,7 +154,7 @@ class JobOffer implements JsonSerializable
     /**
      * Get the value of Url
      *
-     * @return string
+     * @return UrlCollection
      */
     public function getUrl()
     {
@@ -128,11 +164,11 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Url
      *
-     * @param string url
+     * @param UrlCollection url
      *
      * @return self
      */
-    public function setUrl($url)
+    public function setUrl(UrlCollection $url)
     {
         $this->url = $url;
 
@@ -163,40 +199,26 @@ class JobOffer implements JsonSerializable
         return $this;
     }
 
-    public function jsonSerialize()
-    {
-        return [
-          "title" => $this->getTitle(),
-          "exp" => $this->getExp(),
-          "technology" => $this->getTechnology(),
-          "city" => $this->getCity(),
-          "url" => $this->getUrl(),
-          "postTime" => $this->getPostTime(),
-          "company" => $this->getCompany(),
-          "salary" => $this->getSalary()
-      ];
-    }
-
     /**
-     * Get the value of Exp
+     * Get the value of Company
      *
      * @return string
      */
-    public function getExp()
+    public function getCompany()
     {
-        return $this->exp;
+        return $this->company;
     }
 
     /**
-     * Set the value of Exp
+     * Set the value of Company
      *
-     * @param string exp
+     * @param string company
      *
      * @return self
      */
-    public function setExp($exp)
+    public function setCompany(string $company)
     {
-        $this->exp = $exp;
+        $this->company = $company;
 
         return $this;
     }
@@ -218,33 +240,9 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setSalary($salary)
+    public function setSalary(string $salary)
     {
         $this->salary = $salary;
-
-        return $this;
-    }
-
-    /**
-     * Get the value of Company
-     *
-     * @return string
-     */
-    public function getCompany()
-    {
-        return $this->company;
-    }
-
-    /**
-     * Set the value of Company
-     *
-     * @param string company
-     *
-     * @return self
-     */
-    public function setCompany($company)
-    {
-        $this->company = $company;
 
         return $this;
     }
