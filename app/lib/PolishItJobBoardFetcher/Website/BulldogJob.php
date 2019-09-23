@@ -11,7 +11,7 @@ use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 
 use PolishItJobBoardFetcher\Model\Url;
 
-use PolishItJobBoardFetcher\Utility\WebsiteLoopFilterTrait;
+use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
@@ -23,20 +23,24 @@ use Symfony\Component\DomCrawler\Crawler;
 class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
 {
     use JobOfferFactoryTrait;
-    use WebsiteLoopFilterTrait;
+    use WebsiteInterfaceHelperTrait;
     use ReplacePolishLettersTrait;
 
-    public const URL = "https://bulldogjob.pl/";
+    private $url = "https://bulldogjob.pl/";
 
-    public const TECHNOLOGY = [
-      "java", "javascript", "html",
+    private $technology = [
+      "java",
+      "javascript" => [
+        "js"
+      ],
+      "html",
       "php", "python", "c++",
       ".net", "ruby", "kotlin"
     ];
 
-    public const CITY = true;
+    private $city = [];
 
-    public const CATEGORY = [
+    private $category = [
       "backend", "fullstack", "frontend",
       "devops", "analyst", "administrator",
       "tester",
@@ -46,7 +50,8 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
       "support", "architect", "qa",
       "mobile",
       "designer" => [
-        "ux/ui", "design", "ux"
+        "ux/ui", "design", "ux",
+        "ui"
       ],
       "tech_lead" => [
         "tl", "team leader", "tech lead"
@@ -57,7 +62,7 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
       ]
     ];
 
-    public const EXPERIENCE = [
+    private $experience = [
       "junior",
       "medium" => [
         "regular",
@@ -80,13 +85,34 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
         $this->offers = new JobOfferCollection();
     }
 
+    public function getUrl() : string
+    {
+        return $this->url;
+    }
+
+    public function getTechnology()
+    {
+        return $this->technology;
+    }
+
+    public function getCity()
+    {
+        return $this->city;
+    }
+
+    public function getCategory()
+    {
+        return $this->category;
+    }
+
+    public function getExperience()
+    {
+        return $this->experience;
+    }
+
     public function hasTechnology(?string $technology) : bool
     {
-        if (!is_null($technology) && in_array(strtolower($technology), self::TECHNOLOGY)) {
-            return true;
-        } else {
-            return false;
-        }
+        return $this->arrayContains($this->technology, $technology);
     }
 
     public function allowsCustomTechnology() : bool
@@ -96,7 +122,7 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasCategory(?string $category) : bool
     {
-        return $this->constArrayContains(self::CATEGORY, $category);
+        return $this->arrayContains($this->category, $category);
     }
 
     public function allowsCustomCategory() : bool
@@ -106,7 +132,7 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasCity(?string $city) : bool
     {
-        return true;
+        return false;
     }
 
     public function allowsCustomCity() : bool
@@ -116,7 +142,7 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasExperience(?string $exp) : bool
     {
-        return $this->constArrayContains(self::EXPERIENCE, $exp);
+        return $this->arrayContains($this->experience, $exp);
     }
 
     public function allowsCustomExperience() : bool
@@ -129,9 +155,7 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
      */
     public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
     {
-        var_dump(self::URL."companies/jobs".$this->createQueryUrl($technology, $city, $exp, $category));
-        exit();
-        $response = $client->request("GET", self::URL."companies/jobs".$this->createQueryUrl($technology, $city, $exp, $category));
+        $response = $client->request("GET", $this->url."companies/jobs".$this->createQueryUrl($technology, $city, $exp, $category));
         $body = $response->getBody()->getContents();
         $this->handleFetchResponse($body);
     }
@@ -176,13 +200,13 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
 
         $array["url"] = $url_collection;
         $array["title"] = $crawler->filter("a.result-header-name")->text();
-        $array["company"] = $crawler->filter("span.pop-black.desktop")->text();
+        $array["company"] = trim($crawler->filter("span.pop-black.desktop")->text());
         $array["city"] = $city;
         $array["post_time"] = new DateTime($crawler->filter("p.result-desc-meta span.inline-block")->text());
 
         $salary = $crawler->filter("p.result-desc-meta span.pop-green");
 
-        $array["salary"] = (!is_null($salary->getNode(0))) ? $salary->text() : "";
+        $array["salary"] = (!is_null($salary->getNode(0))) ? trim($salary->text()) : "";
 
         $technology = [];
         foreach ($crawler->filter("ul.tags")->children("li") as $key => $technology_dom_element) {
@@ -229,11 +253,11 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
         }
 
         if (!is_null($exp)) {
-            $query .= "/experience_level,".$this->getAdaptedNameFromConstArray(self::EXPERIENCE, $exp);
+            $query .= "/experience_level,".$exp;
         }
 
         if (!is_null($category)) {
-            $query .= "/role,".$this->getAdaptedNameFromConstArray(self::CATEGORY, $category);
+            $query .= "/role,".$category;
         }
 
         return $query;

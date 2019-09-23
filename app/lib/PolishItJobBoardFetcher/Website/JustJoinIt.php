@@ -12,7 +12,7 @@ use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 use PolishItJobBoardFetcher\Model\Url;
 
 use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
-use PolishItJobBoardFetcher\Utility\WebsiteLoopFilterTrait;
+use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
 /**
  * JustJoin.it API call class
@@ -20,22 +20,21 @@ use PolishItJobBoardFetcher\Utility\WebsiteLoopFilterTrait;
 class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
 {
     use JobOfferFactoryTrait;
-    use WebsiteLoopFilterTrait;
+    use WebsiteInterfaceHelperTrait;
 
-    public const URL = "https://justjoin.it/";
+    private $url = "https://justjoin.it/";
 
-    public const TECHNOLOGY = [
-      "js", "html", "php",
+    private $technology = [
+      "javascript" => [
+        "js"
+      ],
+      "html", "php",
       "ruby", "python", "java",
       ".net", "scala", "c",
-      "mobile", "devops",
-      "ui", "pm", "game",
-      "blockchain", "security",
-      "data", "golang", "sap",
-      "other"
+      "golang", "sap", "other"
     ];
 
-    public const CITY = [
+    private $city = [
       "warszawa", "kraków", "wrocław",
       "poznań", "trójmiasto", "sopot",
       "gdynia", "gdańsk", "remote",
@@ -45,10 +44,24 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
       "łódź", "olsztyn", "opole",
       "toruń", "rzeszów", "szczecin"
     ];
-    //TODO SOME OF THE "SKILL/TECHNOLOGIES" got to go here.
-    public const CATEGORY = false;
 
-    public const EXPERIENCE = [
+    private $category = [
+      "mobile",
+      "devops",
+      "ui" => [
+        "ux/ui", "design", "ux",
+        "designer"
+      ],
+      "pm" => [
+        "project_manager", "project manager", "project-manager"
+      ],
+      "game",
+      "security",
+      "blockchain",
+      "data",
+    ];
+
+    private $experience = [
         "junior",
         "mid" => [
           "regular", "medium"
@@ -71,13 +84,34 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
         $this->offers = new JobOfferCollection();
     }
 
+    public function getUrl() : string
+    {
+        return $this->url;
+    }
+
+    public function getTechnology()
+    {
+        return $this->technology;
+    }
+
+    public function getCity()
+    {
+        return $this->city;
+    }
+
+    public function getCategory()
+    {
+        return $this->category;
+    }
+
+    public function getExperience()
+    {
+        return $this->experience;
+    }
+
     public function hasTechnology(?string $technology) : bool
     {
-        if (!is_null($technology) && in_array(strtolower($technology), self::TECHNOLOGY)) {
-            return true;
-        } else {
-            return false;
-        }
+        return $this->arrayContains($this->technology, $technology);
     }
 
     public function allowsCustomTechnology() : bool
@@ -87,7 +121,7 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasCategory(?string $category) : bool
     {
-        return false;
+        return $this->arrayContains($this->category, $category);
     }
 
     public function allowsCustomCategory() : bool
@@ -97,7 +131,7 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasCity(?string $city) : bool
     {
-        if (!is_null($city) && in_array(strtolower($city), self::CITY)) {
+        if (!is_null($city) && in_array(strtolower($city), $this->city)) {
             return true;
         } else {
             return false;
@@ -111,7 +145,7 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasExperience(?string $exp) : bool
     {
-        return $this->constArrayContains(self::EXPERIENCE, $exp);
+        return $this->arrayContains($this->experience, $exp);
     }
 
     public function allowsCustomExperience() : bool
@@ -124,9 +158,9 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
      */
     public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
     {
-        $response = $client->request("GET", self::URL."api/offers");
+        $response = $client->request("GET", $this->url."api/offers");
         $body = $response->getBody()->getContents();
-        $this->handleFetchResponse(json_decode($body, true), $technology, $city, $exp);
+        $this->handleFetchResponse(json_decode($body, true), $technology, $city, $exp, $category);
     }
 
     /**
@@ -151,7 +185,7 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
         $city = ($entry_data["remote"]) ? "Remote" : $entry_data["city"];
 
         $url_job = new Url();
-        $url_job->setUrl(self::URL."offers/".$entry_data["id"]);
+        $url_job->setUrl($this->url."offers/".$entry_data["id"]);
         $url_job->setTitle("offer");
         $url_job->setCity($city);
 
@@ -186,14 +220,24 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
      * @param  string|null $city       City f.i. "Poznań"
      * @param  string|null $exp        Experience f.i. "Junior"
      */
-    private function handleFetchResponse(array $body, ?string $technology, ?string $city, ?string $exp) : void
+    private function handleFetchResponse(array $body, ?string $technology, ?string $city, ?string $exp, ?string $category) : void
     {
         //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs,
-        //It dosn't have the category so we don't use it.
+        //Because some websites use certain "technologies" of this one as categories we had to split the technology into technology and category
+        $look_for_in_marker_icon = [];
+
+        if (!is_null($category)) {
+            $look_for_in_marker_icon[] = strtolower($category);
+        }
+
+        if (!is_null($technology)) {
+            $look_for_in_marker_icon[] = strtolower($technology);
+        }
+
         foreach ($body as $key => $offer_array) {
-            if (is_null($city) or strtolower($city) === strtolower($offer_array["city"]) or ($city === "remote" && $offer_array["remote"])) {
-                if (is_null($exp) or strtolower($exp) === strtolower($offer_array["experience_level"])) {
-                    if (is_null($technology) or strtolower($technology) === strtolower($offer_array["marker_icon"])) {
+            if (is_null($city) or $city === strtolower($offer_array["city"]) or ($city === "remote" && $offer_array["remote"])) {
+                if (is_null($exp) or $exp === $offer_array["experience_level"]) {
+                    if (empty($look_for_in_marker_icon) or in_array($offer_array["marker_icon"], $look_for_in_marker_icon)) {
                         $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer_array));
                     }
                 }

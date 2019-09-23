@@ -13,6 +13,7 @@ use PolishItJobBoardFetcher\Model\Url;
 
 use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
+use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -23,14 +24,15 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
 {
     use JobOfferFactoryTrait;
     use ReplacePolishLettersTrait;
+    use WebsiteInterfaceHelperTrait;
 
-    public const URL = "https://www.pracuj.pl";
+    private $url = "https://www.pracuj.pl";
 
-    public const TECHNOLOGY = true;
+    private $technology = [];
 
-    public const CITY = true;
+    private $city = [];
 
-    public const CATEGORY = [
+    private $category = [
       "5015" => [
         "devops", "analyst", "analityk",
         "administrator", "support", "wsparcie",
@@ -47,8 +49,16 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
       ],
       "5026" => [
         "designer", "ux/ui", "design",
-        "ux"
+        "ux", "ui"
       ]
+    ];
+
+    private $experience = [
+        "junior",
+        "senior" => [
+          "specjalista",
+          "specialist"
+        ]
     ];
 
     /**
@@ -62,23 +72,44 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
         $this->offers = new JobOfferCollection();
     }
 
+    public function getUrl() : string
+    {
+        return $this->url;
+    }
+
+    public function getTechnology()
+    {
+        return $this->technology;
+    }
+
+    public function getCity()
+    {
+        return $this->city;
+    }
+
+    public function getCategory()
+    {
+        return $this->category;
+    }
+
+    public function getExperience()
+    {
+        return $this->experience;
+    }
+
     public function hasTechnology(?string $technology) : bool
     {
-        if (!is_null($technology) && in_array(strtolower(self::TECHNOLOGY))) {
-            return true;
-        } else {
-            return false;
-        }
+        return false;
     }
 
     public function allowsCustomTechnology() : bool
     {
-        return false;
+        return true;
     }
 
     public function hasCategory(?string $category) : bool
     {
-        return false;
+        return $this->arrayContains($this->category, $category);
     }
 
     public function allowsCustomCategory() : bool
@@ -88,7 +119,7 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
 
     public function hasCity(?string $city) : bool
     {
-        return true;
+        return false;
     }
 
     public function allowsCustomCity() : bool
@@ -96,12 +127,22 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
         return true;
     }
 
+    public function hasExperience(?string $exp) : bool
+    {
+        return $this->arrayContains($this->experience, $exp);
+    }
+
+    public function allowsCustomExperience() : bool
+    {
+        return false;
+    }
+
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
     {
-        $response = $client->request("GET", self::URL."/praca".$this->createQueryUrl($technology, $city, $exp));
+        $response = $client->request("GET", $this->url."/praca".$this->createQueryUrl($technology, $city, $exp, $category));
         $body = $response->getBody()->getContents();
         $this->handleFetchResponse($body);
     }
@@ -135,7 +176,7 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
         $city = [];
         foreach ($entry_data["offers"] as $single_offer) {
             $url_job = new Url();
-            $url_job->setUrl(self::URL.$single_offer["offerUrl"]);
+            $url_job->setUrl($this->url.$single_offer["offerUrl"]);
             $url_job->setTitle("offer");
             $url_job->setCity($single_offer["label"]);
 
@@ -175,6 +216,7 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
         if (empty($json)) {
             throw new \Exception("No JSON offers found on the page.", 1);
         }
+
         $json = $json[0];
         //My regex is not perfect, we have to fix it by omiting few chars
         $valid_json = substr($json, 2, -3);
@@ -187,7 +229,7 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
     }
 
 
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp)
+    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category) : string
     {
         $first_part = (is_null($technology))? "" : "/$technology";
         $second_part = "";
@@ -223,10 +265,16 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
         }
 
         //Categories specification IT - administration, programing, design
-        if (strpos($second_part, "?et=4") !== false) {
-            $url .= "cc=5015%2c5016%2c5026";
+        if (is_null($category)) {
+            $category_string = "5015%2c5016%2c5026";
         } else {
-            $url .= "?cc=5015%2c5016%2c5026";
+            $category_string = $category;
+        }
+
+        if (strpos($second_part, "?et=4") !== false) {
+            $url .= "&cc=".$category_string;
+        } else {
+            $url .= "?cc=".$category_string;
         }
 
         return $url;

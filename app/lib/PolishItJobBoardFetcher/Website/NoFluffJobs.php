@@ -10,7 +10,7 @@ use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 
 use PolishItJobBoardFetcher\Model\Url;
 
-use PolishItJobBoardFetcher\Utility\WebsiteLoopFilterTrait;
+use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Model\JobOffer;
@@ -23,12 +23,15 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
 {
     use ReplacePolishLettersTrait;
     use JobOfferFactoryTrait;
-    use WebsiteLoopFilterTrait;
+    use WebsiteInterfaceHelperTrait;
 
-    public const URL = "https://nofluffjobs.com/";
+    private $url = "https://nofluffjobs.com/";
 
-    public const TECHNOLOGY = [
-      "javascript", "java", "angular",
+    private $technology = [
+      "javascript" => [
+        "js"
+      ],
+      "java", "angular",
       ".net", "react", "sql", "python",
       "rest", "spring", "php", "node",
       "aws", "hibernate", "c++",
@@ -38,7 +41,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
       "spark", "c"
     ];
 
-    public const CITY = [
+    private $city = [
       "remote", "warszawa", "wrocław",
       "kraków", "gdańsk", "poznań",
       "trójmiasto", "śląsk", "łódz", "katowice",
@@ -47,7 +50,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
       "sopot", "zdalnie"
     ];
 
-    public const CATEGORY = [
+    private $category = [
       "backend", "frontend", "fullstack",
       "mobile", "testing", "devops",
       "project-manager" => [
@@ -65,8 +68,22 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
       ],
       "it-trainee",
       "ux" => [
-        "ux/ui", "design", "designer"
+        "ux/ui", "design", "designer",
+        "ui"
       ]
+    ];
+
+    private $experience = [
+        "trainee",
+        "junior",
+        "mid" => [
+          "regular", "medium"
+        ],
+        "senior" => [
+          "specjalista",
+          "specialist"
+        ],
+        "expert"
     ];
 
     /**
@@ -80,13 +97,29 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         $this->offers = new JobOfferCollection();
     }
 
-    public function hasTechnology(?string $technology) : bool
+    public function getUrl() : string
     {
-        if (!is_null($technology) && in_array(strtolower(self::TECHNOLOGY))) {
-            return true;
-        } else {
-            return false;
-        }
+        return $this->url;
+    }
+
+    public function getTechnology()
+    {
+        return $this->technology;
+    }
+
+    public function getCity()
+    {
+        return $this->city;
+    }
+
+    public function getCategory()
+    {
+        return $this->category;
+    }
+
+    public function getExperience()
+    {
+        return $this->experience;
     }
 
     public function allowsCustomTechnology() : bool
@@ -94,14 +127,24 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         return true;
     }
 
+    public function hasTechnology(?string $technology) : bool
+    {
+        return $this->arrayContains($this->technology, $technology);
+    }
+
     public function allowsCustomCategory() : bool
     {
         return false;
     }
 
+    public function hasCategory(?string $category) : bool
+    {
+        return $this->arrayContains($this->category, $category);
+    }
+
     public function hasCity(?string $city) : bool
     {
-        if (!is_null($city) && in_array(strtolower(self::CITY))) {
+        if (!is_null($city) && in_array(strtolower($city), $this->city)) {
             return true;
         } else {
             return false;
@@ -113,10 +156,20 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         return true;
     }
 
+    public function hasExperience(?string $exp) : bool
+    {
+        return $this->arrayContains($this->experience, $exp);
+    }
+
+    public function allowsCustomExperience() : bool
+    {
+        return false;
+    }
+
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
     {
         if (!is_null($city)) {
             $city = $this->replacePolishLetters($city);
@@ -127,9 +180,10 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         }
 
         $options = [
-          "json" => $this->getRequestBody($technology, $city, $exp)
+          "json" => $this->getRequestBody($technology, $city, $exp, $category)
         ];
-        $response = $client->request("POST", self::URL."api/search/posting", $options);
+
+        $response = $client->request("POST", $this->url."api/search/posting", $options);
         $body = $response->getBody()->getContents();
         $this->handleFetchResponse(json_decode($body, true));
     }
@@ -177,7 +231,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         $array["city"] = $city;
 
         $url_job = new Url();
-        $url_job->setUrl(self::URL."job/".$entry_data["url"]);
+        $url_job->setUrl($this->url."job/".$entry_data["url"]);
         $url_job->setTitle("offer");
         $url_job->setCity($city);
 
@@ -203,9 +257,10 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
      * @param  string|null $technology Query
      * @param  string|null $city       Query
      * @param  string|null $exp        Query
+     * @param  string|null $category   Query
      * @return array              Returns the $body
      */
-    private function getRequestBody(?string $technology, ?string $city, ?string $exp) : array
+    private function getRequestBody(?string $technology, ?string $city, ?string $exp, ?string $category) : array
     {
         $body = [
           "criteriaSearch" => [
@@ -232,6 +287,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         $body = $this->setSearchCriteriaOnCustomOrPicked($body, "technology", $technology);
         $body = $this->setSearchCriteriaOnCustomOrPicked($body, "city", $city);
         $body = $this->setSearchCriteriaOnCustomOrPicked($body, "exp", $exp);
+        $body = $this->setSearchCriteriaOnCustomOrPicked($body, "category", $category);
 
         return $body;
     }
@@ -246,22 +302,21 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
     protected function setSearchCriteriaOnCustomOrPicked(array $body, string $picked_array_key, ?string $value) : array
     {
         $city_without_polish_letters = array_map(function ($city) {
-            return $this->removePolishLetters($city);
-        }, self::CITY);
+            return $this->replacePolishLetters($city);
+        }, $this->city);
 
         $picked = [
-          "technology" => self::TECHNOLOGY,
+          "technology" => $this->technology,
           "city" => $city_without_polish_letters,
-          "exp" => [
-            "trainee", "junior", "mid",
-            "senior", "expert"
-          ]
+          "exp" => $this->getStringKeyOrValueFromArray($this->experience),
+          "category" => $this->getStringKeyOrValueFromArray($this->category)
         ];
 
         $array_key_to_body_criteria = [
           "city" => "location",
           "technology" => "technology",
-          "exp" => "seniority"
+          "exp" => "seniority",
+          "category" => "category"
         ];
 
         if (!array_key_exists($picked_array_key, $picked)) {
@@ -274,7 +329,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         }
 
         if (in_array($value, $picked[$picked_array_key])) {
-            if ($picked_array_key === "exp") {
+            if (in_array($picked_array_key, ["exp", "category"])) {
                 $body["criteriaSearch"][$array_key_to_body_criteria[$picked_array_key]] = [$value];
             } else {
                 $body["criteriaSearch"][$array_key_to_body_criteria[$picked_array_key]]["picked"] = [$value];
@@ -284,5 +339,20 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         }
 
         return $body;
+    }
+
+
+    /**
+     * Will return all the strings in keys or values for depth 1
+     * @param  array  $array
+     * @return array
+     */
+    protected function getStringKeyOrValueFromArray(array $array) : array
+    {
+        $keys = array_keys($array);
+        $values = array_values($array);
+        $merged = array_merge($keys, $values);
+
+        return array_filter($merged, "is_string");
     }
 }

@@ -54,26 +54,26 @@ class BoardFetcher
         foreach ($websites as $key => $class) {
             $class_instance = new $class;
             if ($class_instance instanceof WebsiteInterface) {
-                if (!$class_instance->allowsCustomExperience()) {
-                    $exp_adapted = ($class_instance->hasExperience($exp)) ? $exp : null;
+                if (!is_null($exp) and (!$class_instance->allowsCustomExperience() or $class_instance->hasExperience($exp))) {
+                    $exp_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getExperience(), $exp);
                 } else {
                     $exp_adapted = $exp;
                 }
 
-                if (!$class_instance->allowsCustomCity()) {
-                    $city_adapted = ($class_instance->hasCity($city)) ? $city : null;
+                if (!is_null($city) and (!$class_instance->allowsCustomCity() or $class_instance->hasCity($city))) {
+                    $city_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getCity(), $city);
                 } else {
                     $city_adapted = $city;
                 }
 
-                if (!$class_instance->allowsCustomCategory()) {
-                    $category_adapted = ($class_instance->hasCategory($category)) ? $category : null;
+                if (!is_null($category) and (!$class_instance->allowsCustomCategory() or $class_instance->hasCategory($category))) {
+                    $category_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getCategory(), $category);
                 } else {
                     $category_adapted = $category;
                 }
 
-                if (!$class_instance->allowsCustomTechnology()) {
-                    $technology_adapted = ($class_instance->hasTechnology($technology)) ? $technology : null;
+                if (!is_null($technology) and (!$class_instance->allowsCustomTechnology() or $class_instance->hasTechnology($technology))) {
+                    $technology_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getTechnology(), $technology);
                 } else {
                     $technology_adapted = $technology;
                 }
