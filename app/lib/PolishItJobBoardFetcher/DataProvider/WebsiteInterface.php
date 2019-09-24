@@ -1,5 +1,5 @@
 <?php
-namespace PolishItJobBoardFetcher\Website;
+namespace PolishItJobBoardFetcher\DataProvider;
 
 use GuzzleHttp\Client;
 
@@ -56,7 +56,8 @@ interface WebsiteInterface
     public function allowsCustomExperience() : bool;
 
     /**
-     * Checks if the value is inside the $array, if it is it will try to adapt the given $look_for string to one of $array keys
+     * Checks if the value is inside the $array, if it is it will look for the $look_for inside key/values
+     * and if it is inside values it will return the key
      * @param  array  $array    ["key" => ["value", "value"] ... ]
      * @param  string $look_for The value to look for inside the $array
      * @return string|null          If it finds something it will return the value else null.

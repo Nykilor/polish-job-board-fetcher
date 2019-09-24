@@ -5,11 +5,10 @@ use Exception;
 
 use GuzzleHttp\Client;
 
-use PolishItJobBoardFetcher\Website\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
-
-use PolishItJobBoardFetcher\Website\JobOfferFactoryInterface;
 
 /**
  * The main class to fetch the data with
@@ -33,7 +32,7 @@ class BoardFetcher
 
     /**
      * Initate a fetch from given $websites filtered $by["technology"|"city"|"exp"]
-     * @param  array  $websites Array of websites implementing PolishItJobBoardFetcher\Website\WebsiteInterface
+     * @param  array  $websites Array of websites implementing PolishItJobBoardFetcher\DataProvider\Website\WebsiteInterface
      * @param  array  $by       Array to filter the offers by, it can be by technology, city and exp
      */
     public function fetchFromBy(array $websites, array $by) : void
@@ -89,7 +88,7 @@ class BoardFetcher
                     throw new \Exception("Website has to be an instance of JobOfferFactoryInterface", 1);
                 }
             } else {
-                throw new \Exception("Array entries must be a instance of PolishItJobBoardFetcher\Website\WebsiteInterface");
+                throw new \Exception("Array entries must be a instance of PolishItJobBoardFetcher\DataProvider\Website\WebsiteInterface");
             }
         }
 

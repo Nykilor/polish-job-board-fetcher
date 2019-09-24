@@ -1,10 +1,15 @@
 <?php
 
-namespace PolishItJobBoardFetcher\Website;
+namespace PolishItJobBoardFetcher\DataProvider\Website;
 
 use DateTime;
 
 use GuzzleHttp\Client;
+
+use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
+
+use PolishItJobBoardFetcher\DataProvider\WebsiteType\Redux;
 
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
@@ -15,12 +20,10 @@ use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
-use Symfony\Component\DomCrawler\Crawler;
-
 /**
  * JustJoin.it API call class
  */
-class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
+class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
 {
     use JobOfferFactoryTrait;
     use ReplacePolishLettersTrait;
@@ -197,33 +200,9 @@ class Pracuj implements WebsiteInterface, JobOfferFactoryInterface
 
     private function handleFetchResponse($body)
     {
-        $crawler = new Crawler($body);
-        $script = $crawler->filter("script");
+        $this->setInitialStateFromHtml($body);
 
-        foreach ($script as $dom_element) {
-            if (strpos($dom_element->nodeValue, "window.__INITIAL_STATE__") !== false) {
-                $offers_dom_element = $dom_element;
-                break;
-            } else {
-                $dom_element = null;
-            }
-        }
-
-        $script_text = $dom_element->nodeValue;
-        $json = "";
-        preg_match("/\=(.*?)\n/", $script_text, $json);
-
-        if (empty($json)) {
-            throw new \Exception("No JSON offers found on the page.", 1);
-        }
-
-        $json = $json[0];
-        //My regex is not perfect, we have to fix it by omiting few chars
-        $valid_json = substr($json, 2, -3);
-        //print $valid_json;
-        $entry_data_array = json_decode($valid_json, true);
-
-        foreach ($entry_data_array["offers"] as $key => $offer) {
+        foreach ($this->getInitialState()["offers"] as $key => $offer) {
             $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer));
         }
     }

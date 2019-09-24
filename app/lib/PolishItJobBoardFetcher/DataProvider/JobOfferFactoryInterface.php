@@ -1,5 +1,5 @@
 <?php
-namespace PolishItJobBoardFetcher\Website;
+namespace PolishItJobBoardFetcher\DataProvider;
 
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 

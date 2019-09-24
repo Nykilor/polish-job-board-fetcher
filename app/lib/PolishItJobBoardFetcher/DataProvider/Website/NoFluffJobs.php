@@ -1,11 +1,13 @@
 <?php
 
-namespace PolishItJobBoardFetcher\Website;
+namespace PolishItJobBoardFetcher\DataProvider\Website;
 
 use DateTime;
 use Exception;
 
 use GuzzleHttp\Client;
+use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 
 use PolishItJobBoardFetcher\Model\Url;
@@ -15,6 +17,8 @@ use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Model\JobOffer;
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
+
+use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
 /**
  * JustJoin.it API call class

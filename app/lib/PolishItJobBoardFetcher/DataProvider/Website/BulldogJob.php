@@ -1,11 +1,13 @@
 <?php
 
-namespace PolishItJobBoardFetcher\Website;
+namespace PolishItJobBoardFetcher\DataProvider\Website;
 
 use DateTime;
 use DOMElement;
 
 use GuzzleHttp\Client;
+
+use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 
@@ -15,6 +17,8 @@ use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
+use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
+
 use Symfony\Component\DomCrawler\Crawler;
 
 /**

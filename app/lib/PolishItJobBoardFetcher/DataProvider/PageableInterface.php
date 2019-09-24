@@ -1,4 +1,5 @@
 <?php
+namespace PolishItJobBoardFetcher\DataProvider;
 
 /**
  * If we scrap a webpage and it is divided by pages.
