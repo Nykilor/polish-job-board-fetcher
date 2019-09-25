@@ -19,6 +19,7 @@ trait JobOfferFactoryTrait
         $offer->setPostTime($job_offer_class_variables_array["post_time"]);
         $offer->setCompany($job_offer_class_variables_array["company"]);
         $offer->setSalary($job_offer_class_variables_array["salary"]);
+        $offer->setContractType($job_offer_class_variables_array["contract_type"]);
 
         return $offer;
     }

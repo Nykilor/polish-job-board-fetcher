@@ -1,7 +1,6 @@
 <?php
 namespace PolishItJobBoardFetcher\Model;
 
-use PolishItJobBoardFetcher\Model\Url;
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
 
 use JsonSerializable;
@@ -47,6 +46,11 @@ class JobOffer implements JsonSerializable
     private $salary;
 
     /**
+     * @var string
+     */
+    private $contractType;
+
+    /**
      * Implementation of JsonSerializable
      * @return array Array with all variables of the class.
      */
@@ -72,7 +76,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setTitle(string $title)
+    public function setTitle(string $title) : self
     {
         $this->title = $title;
 
@@ -96,7 +100,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setExp($exp)
+    public function setExp($exp) : self
     {
         $this->exp = $exp;
 
@@ -120,7 +124,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setTechnology(array $technology)
+    public function setTechnology(array $technology) : self
     {
         $this->technology = $technology;
 
@@ -144,7 +148,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setCity(string $city)
+    public function setCity(string $city) : self
     {
         $this->city = $city;
 
@@ -168,7 +172,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setUrl(UrlCollection $url)
+    public function setUrl(UrlCollection $url) : self
     {
         $this->url = $url;
 
@@ -192,7 +196,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setPostTime(\DateTime $postTime)
+    public function setPostTime(\DateTime $postTime) : self
     {
         $this->postTime = $postTime;
 
@@ -216,7 +220,7 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setCompany(string $company)
+    public function setCompany(string $company) : self
     {
         $this->company = $company;
 
@@ -240,9 +244,33 @@ class JobOffer implements JsonSerializable
      *
      * @return self
      */
-    public function setSalary(string $salary)
+    public function setSalary(string $salary) : self
     {
         $this->salary = $salary;
+
+        return $this;
+    }
+
+    /**
+     * Get the value of Contract Type
+     *
+     * @return string
+     */
+    public function getContractType()
+    {
+        return $this->contractType;
+    }
+
+    /**
+     * Set the value of Contract Type
+     *
+     * @param string contractType
+     *
+     * @return self
+     */
+    public function setContractType(string $contractType) : self
+    {
+        $this->contractType = $contractType;
 
         return $this;
     }

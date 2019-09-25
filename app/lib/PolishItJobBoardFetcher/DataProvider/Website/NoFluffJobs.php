@@ -90,6 +90,8 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         "expert"
     ];
 
+    private $contractType = [];
+
     /**
      * Array containing the JobOffers made from the data fetched.
      * @var JobOfferCollection
@@ -124,6 +126,11 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
     public function getExperience()
     {
         return $this->experience;
+    }
+
+    public function getContractType()
+    {
+        return $this->contractType;
     }
 
     public function allowsCustomTechnology() : bool
@@ -170,10 +177,20 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         return false;
     }
 
+    public function hasContractType(?string $contractType) : bool
+    {
+        return false;
+    }
+
+    public function allowsCustomContractType() : bool
+    {
+        return false;
+    }
+
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
     {
         if (!is_null($city)) {
             $city = $this->replacePolishLetters($city);
@@ -252,6 +269,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
 
         $array["company"] = $entry_data["name"];
         $array["salary"] = "";
+        $array["contract_type"] = "";
 
         return $array;
     }

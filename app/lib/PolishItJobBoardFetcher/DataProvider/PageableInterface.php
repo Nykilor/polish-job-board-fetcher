@@ -6,7 +6,9 @@ namespace PolishItJobBoardFetcher\DataProvider;
  */
 interface PageableInterface
 {
-    public $pageLimit = 1;
+    public function getCurrentPage() : int;
+
+    public function getNextPageUrl() : string;
 
     public function fetchNextPage();
 }

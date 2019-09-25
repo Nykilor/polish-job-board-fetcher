@@ -78,6 +78,8 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
       ]
     ];
 
+    private $contractType = [];
+
     /**
      * Array containing the JobOffers made from the data fetched.
      * @var JobOfferCollection
@@ -112,6 +114,11 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
     public function getExperience()
     {
         return $this->experience;
+    }
+
+    public function getContractType()
+    {
+        return $this->contractType;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -154,10 +161,20 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
         return false;
     }
 
+    public function hasContractType(?string $contractType) : bool
+    {
+        return false;
+    }
+
+    public function allowsCustomContractType() : bool
+    {
+        return false;
+    }
+
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
     {
         $response = $client->request("GET", $this->url."companies/jobs".$this->createQueryUrl($technology, $city, $exp, $category));
         $body = $response->getBody()->getContents();
@@ -219,6 +236,7 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
         }
         $array["technology"] = $technology;
         $array["exp"] = "";
+        $array["contract_type"] = "";
 
         return $array;
     }

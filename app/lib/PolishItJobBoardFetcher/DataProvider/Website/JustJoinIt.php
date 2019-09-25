@@ -76,6 +76,12 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
         ]
     ];
 
+    private $contractType = [
+      "b2b",
+      "permanent",
+      "mandate_contract"
+    ];
+
     /**
      * Array containing the JobOffers made from the data fetched.
      * @var JobOfferCollection
@@ -111,6 +117,11 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
     public function getExperience()
     {
         return $this->experience;
+    }
+
+    public function getContractType()
+    {
+        return $this->contractType;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -157,14 +168,24 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
         return false;
     }
 
+    public function hasContractType(?string $contractType) : bool
+    {
+        return $this->arrayContains($this->contractType, $contractType);
+    }
+
+    public function allowsCustomContractType() : bool
+    {
+        return false;
+    }
+
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
     {
         $response = $client->request("GET", $this->url."api/offers");
         $body = $response->getBody()->getContents();
-        $this->handleFetchResponse(json_decode($body, true), $technology, $city, $exp, $category);
+        $this->handleFetchResponse(json_decode($body, true), $technology, $city, $exp, $category, $contract_type);
     }
 
     /**
@@ -213,18 +234,20 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
             $salary = "";
         }
         $array["salary"] = $salary;
+        $array["contract_type"] = $entry_data["employment_type"];
 
         return $array;
     }
 
     /**
      * Filter fetched offers $by variables and adds it to $this->offers
-     * @param  array  $body       Fetch body.
-     * @param  string|null $technology Technology f.i. "php"
-     * @param  string|null $city       City f.i. "Poznań"
-     * @param  string|null $exp        Experience f.i. "Junior"
+     * @param  array       $body           Fetch body.
+     * @param  string|null $technology     Technology f.i. "php"
+     * @param  string|null $city           City f.i. "Poznań"
+     * @param  string|null $exp            Experience f.i. "Junior"
+     * @param  string|null $contract_type  Contract type f.i. "b2b"
      */
-    private function handleFetchResponse(array $body, ?string $technology, ?string $city, ?string $exp, ?string $category) : void
+    private function handleFetchResponse(array $body, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : void
     {
         //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs,
         //Because some websites use certain "technologies" of this one as categories we had to split the technology into technology and category
@@ -242,7 +265,9 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
             if (is_null($city) or $city === strtolower($offer_array["city"]) or ($city === "remote" && $offer_array["remote"])) {
                 if (is_null($exp) or $exp === $offer_array["experience_level"]) {
                     if (empty($look_for_in_marker_icon) or in_array($offer_array["marker_icon"], $look_for_in_marker_icon)) {
-                        $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer_array));
+                        if (is_null($contract_type) or strtolower($contract_type) === $offer_array["employment_type"]) {
+                            $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer_array));
+                        }
                     }
                 }
             }

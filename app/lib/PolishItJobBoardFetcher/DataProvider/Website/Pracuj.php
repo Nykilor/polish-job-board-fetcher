@@ -64,6 +64,21 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
         ]
     ];
 
+    private $contractType = [
+      "0" => [
+        "permanent"
+      ],
+      "1" => [
+        "contract_work"
+      ],
+      "2" => [
+        "mandate_contract"
+      ],
+      "3" => [
+        "b2b"
+      ]
+    ];
+
     /**
      * Array containing the JobOffers made from the data fetched.
      * @var JobOfferCollection
@@ -98,6 +113,11 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
     public function getExperience()
     {
         return $this->experience;
+    }
+
+    public function getContractType()
+    {
+        return $this->contractType;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -140,12 +160,22 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
         return false;
     }
 
+    public function hasContractType(?string $contractType) : bool
+    {
+        return $this->arrayContains($this->contractType, $contractType);
+    }
+
+    public function allowsCustomContractType() : bool
+    {
+        return false;
+    }
+
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
     {
-        $response = $client->request("GET", $this->url."/praca".$this->createQueryUrl($technology, $city, $exp, $category));
+        $response = $client->request("GET", $this->url."/praca".$this->createQueryUrl($technology, $city, $exp, $category, $contract_type));
         $body = $response->getBody()->getContents();
         $this->handleFetchResponse($body);
     }
@@ -194,6 +224,7 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
 
         $array["url"] = $url_collection_model;
         $array["city"] = implode(",", $city);
+        $array["contract_type"] = implode(",", $entry_data["typesOfContract"]);
 
         return $array;
     }
@@ -208,7 +239,7 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
     }
 
 
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category) : string
+    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : string
     {
         $first_part = (is_null($technology))? "" : "/$technology";
         $second_part = "";
@@ -254,6 +285,14 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
             $url .= "&cc=".$category_string;
         } else {
             $url .= "?cc=".$category_string;
+        }
+
+        if (!is_null($contract_type)) {
+            if (strpos($url, "?") !== false) {
+                $url .= "tc=".$contract_type;
+            } else {
+                $url .= "?tc=".$contract_type;
+            }
         }
 
         return $url;
