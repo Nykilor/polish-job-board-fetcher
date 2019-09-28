@@ -6,6 +6,8 @@ use DateTime;
 use Exception;
 
 use GuzzleHttp\Client;
+use GuzzleHttp\Psr7\Response;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
@@ -190,7 +192,7 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
     {
         if (!is_null($city)) {
             $city = $this->replacePolishLetters($city);
@@ -205,8 +207,8 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         ];
 
         $response = $client->request("POST", $this->url."api/search/posting", $options);
-        $body = $response->getBody()->getContents();
-        $this->handleFetchResponse(json_decode($body, true));
+
+        return $response;
     }
 
     /**
@@ -217,12 +219,10 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         return $this->offers;
     }
 
-    /**
-     * Starts to create JobOffers by given response
-     * @param  array  $response The api call response
-     */
-    public function handleFetchResponse(array $response) : void
+    public function handleResponse(Response $response) : void
     {
+        $body = json_decode($response->getBody()->getContents(), true);
+
         foreach ($response["postings"] as $key => $entry_data) {
             $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($entry_data));
         }

@@ -6,6 +6,8 @@ use DateTime;
 
 use GuzzleHttp\Client;
 
+use GuzzleHttp\Psr7\Response;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
@@ -175,11 +177,11 @@ class Olx implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
     {
         $response = $client->request("GET", $this->url."api/v1/offers/?".$this->createQueryUrl($technology, $city, $exp, $category, $contract_type));
-        $body = $response->getBody()->getContents();
-        $this->handleFetchResponse(json_decode($body, true));
+
+        return $response;
     }
 
     /**
@@ -190,8 +192,10 @@ class Olx implements WebsiteInterface, JobOfferFactoryInterface
         return $this->offers;
     }
 
-    private function handleFetchResponse($body)
+    public function handleResponse(Response $response) : void
     {
+        $body = json_decode($response->getBody()->getContents(), true);
+
         if (isset($body["data"])) {
             foreach ($body["data"] as $offer) {
                 $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer));

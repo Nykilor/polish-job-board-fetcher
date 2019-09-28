@@ -6,6 +6,8 @@ use DateTime;
 
 use GuzzleHttp\Client;
 
+use GuzzleHttp\Psr7\Response;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
@@ -173,11 +175,11 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
     {
         $response = $client->request("GET", $this->url."/praca".$this->createQueryUrl($technology, $city, $exp, $category, $contract_type));
-        $body = $response->getBody()->getContents();
-        $this->handleFetchResponse($body);
+
+        return $response;
     }
 
     /**
@@ -229,8 +231,10 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
         return $array;
     }
 
-    private function handleFetchResponse($body)
+    public function handleResponse(Response $response) : void
     {
+        $body = $response->getBody()->getContents();
+
         $this->setInitialStateFromHtml($body);
 
         foreach ($this->getInitialState()["offers"] as $key => $offer) {

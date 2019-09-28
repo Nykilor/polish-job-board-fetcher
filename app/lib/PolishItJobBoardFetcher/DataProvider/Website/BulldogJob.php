@@ -7,6 +7,8 @@ use DOMElement;
 
 use GuzzleHttp\Client;
 
+use GuzzleHttp\Psr7\Response;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 
 use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
@@ -79,6 +81,8 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
     ];
 
     private $contractType = [];
+
+    private $query = [];
 
     /**
      * Array containing the JobOffers made from the data fetched.
@@ -174,11 +178,11 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type)
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
     {
         $response = $client->request("GET", $this->url."companies/jobs".$this->createQueryUrl($technology, $city, $exp, $category));
-        $body = $response->getBody()->getContents();
-        $this->handleFetchResponse($body);
+
+        return $response;
     }
 
     /**
@@ -189,8 +193,10 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
         return $this->offers;
     }
 
-    private function handleFetchResponse($body)
+    public function handleResponse(Response $response) : void
     {
+        $body = $response->getBody()->getContents();
+
         $crawler = new Crawler($body);
         foreach ($crawler->filter(".results-list")->children("li.results-list-item:not(.subscribe-search)") as $dom_element) {
             $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($dom_element));

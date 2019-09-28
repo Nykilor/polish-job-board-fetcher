@@ -3,6 +3,8 @@ namespace PolishItJobBoardFetcher\DataProvider;
 
 use GuzzleHttp\Client;
 
+use GuzzleHttp\Psr7\Response;
+
 /**
  * Interface for Website classes
  */
@@ -18,7 +20,13 @@ interface WebsiteInterface
      * @param  string|null $exp              The experience to fetch by.
      * @param  string|null $contract_type    The contract type to fetch by.
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type);
+    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response;
+
+    /**
+     * Handles the given response and initates the creation of offers.
+     * @param Response $response The Guzzle http response created by the fetchOffers method.
+     */
+    public function handleResponse(Response $response) : void;
 
     /**
      * @return bool|array
