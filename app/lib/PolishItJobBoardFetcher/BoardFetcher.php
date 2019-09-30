@@ -1,13 +1,13 @@
 <?php
 namespace PolishItJobBoardFetcher;
 
-use Exception;
-use Generator;
-
 use GuzzleHttp\Client;
 
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
-use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
+
+use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
+
+use PolishItJobBoardFetcher\Factory\JobOfferFactory;
 
 use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 
@@ -23,13 +23,21 @@ class BoardFetcher
 
     private $websites = [];
 
-    private $query = [];
+    private $queryCreator = [];
 
     private $response = [];
+
+    private $offers;
 
     public function __construct(array $client_config = [])
     {
         $this->client = (!empty($client_config)) ? new Client($client_config) : new Client();
+        $this->offers = new JobOfferCollection();
+    }
+
+    public function setQuery(array $query)
+    {
+        $this->queryCreator = new WebsiteQueryCreator($query);
     }
 
     public function setWebsites(array $websites)
@@ -48,106 +56,48 @@ class BoardFetcher
             }
         }
     }
-    //Do this in all the websites.
-    public function setQuery(array $by) : void
+
+    public function fetch(bool $strict = false)
     {
-        $avaliable_query_variables = [
-          "technology" => null,
-          "city" => null,
-          "exp" => null,
-          "category" => null,
-          "contract_type" => null
-        ];
-
-        foreach ($by as $key => $value) {
-            if (in_array($key, $avaliable_query_variables)) {
-                $avaliable_query_variables[$key] = $value;
-            }
-        }
-
-        //The list would be just to long if we let the user scroll trough it all
-        if (empty(array_filter($avaliable_query_variables))) {
-            throw new Exception("You need to specify valid query values.");
-        }
-
-        $this->query = $avaliable_query_variables;
-    }
-
-    public function fetch(bool $handle_data = true) : Generator
-    {
-        if (empty($this->websites) or empty($this->query)) {
+        if (empty($this->websites) or empty($this->queryCreator)) {
             throw new \Exception("You need to first setQuery() and setWebsites()", 1);
         }
 
         foreach ($this->websites as $key => $class) {
             $class_instance = $class;
 
-            $variables = $this->getAdaptedQueryVariableValuesForWebsite($class_instance);
+            $query = $this->queryCreator->getQueryForClass($class_instance);
 
-            //If everything is null just go to next website
-            if (empty(array_filter($variables))) {
-                continue;
-            }
-
-            list($technology_adapted, $city_adapted, $exp_adapted, $category_adapted, $contract_type_adapted) = $variables;
-
-
-            $response = $class_instance->fetchOffers($this->client, $technology_adapted, $city_adapted, $exp_adapted, $category_adapted, $contract_type_adapted);
-
-            if ($handle_data) {
-                if ($class_instance instanceof JobOfferFactoryInterface) {
-                    $class_instance->handleResponse($response);
-
-                    yield $class_instance->getJobOfferCollection();
-                } else {
-                    throw new \Exception("Website has to be an instance of JobOfferFactoryInterface", 1);
+            if ($strict === true) {
+                //If any value in the query got null just go on to the next one
+                foreach ($this->queryCreator->query as $original_query_key => $original_query_value) {
+                    if (array_key_exists($original_query_key, $query) && !is_null($original_query_value) && is_null($query[$original_query_key])) {
+                        continue;
+                    }
                 }
             } else {
-                yield $response;
+                //If everything is null just go to next website
+                if (empty(array_filter($query))) {
+                    continue;
+                }
+            }
+
+            $response = $class_instance->fetchOffers($this->client, $query);
+
+            $factory = new JobOfferFactory();
+
+            if ($class_instance instanceof HasJobOfferNormalizerInterface) {
+                foreach ($class_instance->handleResponse($response) as $key => $entry_data) {
+                    $this->offers[] = $factory->createJobOfferModel($class_instance->getNormalizer(), $entry_data);
+                }
+            } else {
+                throw new \Exception("Class has to implement PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface", 1);
             }
         }
     }
 
-    public function getOffersCollection() :? JobOfferCollection
+    public function getJobOffersCollection() : JobOfferCollection
     {
         return $this->offers;
-    }
-
-    protected function getAdaptedQueryVariableValuesForWebsite(WebsiteInterface $class_instance) : array
-    {
-        list($technology, $city, $exp, $category, $contract_type) = $this->query;
-
-        //EXPERIENCE
-        if (!is_null($exp) and (!$class_instance->allowsCustomExperience() or $class_instance->hasExperience($exp))) {
-            $exp_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getExperience(), $exp);
-        } else {
-            $exp_adapted = $exp;
-        }
-        //CITY
-        if (!is_null($city) and (!$class_instance->allowsCustomCity() or $class_instance->hasCity($city))) {
-            $city_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getCity(), $city);
-        } else {
-            $city_adapted = $city;
-        }
-        //CATEGORY
-        if (!is_null($category) and (!$class_instance->allowsCustomCategory() or $class_instance->hasCategory($category))) {
-            $category_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getCategory(), $category);
-        } else {
-            $category_adapted = $category;
-        }
-        //TECHNOLOGY
-        if (!is_null($technology) and (!$class_instance->allowsCustomTechnology() or $class_instance->hasTechnology($technology))) {
-            $technology_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getTechnology(), $technology);
-        } else {
-            $technology_adapted = $technology;
-        }
-        //CONTRACT_TYPE
-        if (!is_null($contract_type) and (!$class_instance->allowsCustomContractType() or $class_instance->hasContractType($contract_type))) {
-            $contract_type_adapted = $class_instance->getAdaptedNameFromArray($class_instance->getContractType(), $contract_type);
-        } else {
-            $contract_type_adapted = $contract_type;
-        }
-
-        return [$technology_adapted, $city_adapted, $exp_adapted, $category_adapted, $contract_type_adapted];
     }
 }

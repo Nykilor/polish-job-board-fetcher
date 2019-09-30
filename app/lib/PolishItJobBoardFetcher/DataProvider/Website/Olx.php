@@ -2,34 +2,44 @@
 
 namespace PolishItJobBoardFetcher\DataProvider\Website;
 
-use DateTime;
+use Generator;
 
 use GuzzleHttp\Client;
 
 use GuzzleHttp\Psr7\Response;
 
+use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
-use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
+use PolishItJobBoardFetcher\Factory\Normalizer\OlxNormalizer;
 
-use PolishItJobBoardFetcher\Model\Url;
+use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
-use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
-use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
-use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
 /**
  * olx.pl API call class
  */
-class Olx implements WebsiteInterface, JobOfferFactoryInterface
+class Olx implements
+    WebsiteInterface,
+    HasJobOfferNormalizerInterface,
+    CategoryQueryFieldInterface,
+    CityQueryFieldInterface,
+    ContractTypeQueryFieldInterface,
+    ExperienceQueryFieldInterface,
+    TechnologyQueryFieldInterface
 {
-    use JobOfferFactoryTrait;
     use WebsiteInterfaceHelperTrait;
     use ReplacePolishLettersTrait;
 
-    private $url = "https://olx.pl/";
+    public const URL = "https://olx.pl/";
 
     private $technology = [];
 
@@ -82,22 +92,6 @@ class Olx implements WebsiteInterface, JobOfferFactoryInterface
         "b2b"
       ]
     ];
-
-    /**
-     * Array containing the JobOffers made from the data fetched.
-     * @var JobOfferCollection
-     */
-    private $offers;
-
-    public function __construct()
-    {
-        $this->offers = new JobOfferCollection();
-    }
-
-    public function getUrl() : string
-    {
-        return $this->url;
-    }
 
     public function getTechnology()
     {
@@ -177,82 +171,27 @@ class Olx implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
+    public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", $this->url."api/v1/offers/?".$this->createQueryUrl($technology, $city, $exp, $category, $contract_type));
+        $response = $client->request("GET", self::URL."api/v1/offers/?".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"]));
 
         return $response;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
-    public function getJobOfferCollection() : JobOfferCollection
+    public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return $this->offers;
+        return new OlxNormalizer();
     }
 
-    public function handleResponse(Response $response) : void
+    public function handleResponse(Response $response) : Generator
     {
-        $body = json_decode($response->getBody()->getContents(), true);
+        $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
         if (isset($body["data"])) {
             foreach ($body["data"] as $offer) {
-                $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer));
+                yield $offer;
             }
         }
-    }
-
-    /**
-     * Implementation of JobOfferFactoryInterface
-     */
-    public function adaptFetchedDataForModelCreation($offer) : array
-    {
-        $city = $offer["location"]["city"]["name"];
-
-        if (isset($offer["location"]["district"]["name"])) {
-            $city .= ", ".$offer["location"]["district"]["name"];
-        }
-
-        if (isset($offer["location"]["region"]["name"])) {
-            $city .= ", ".$offer["location"]["region"]["name"];
-        }
-
-        $url_job = new Url();
-        $url_job->setUrl($offer["url"]);
-        $url_job->setTitle("offer");
-        $url_job->setCity($city);
-
-        $url_collection = new UrlCollection();
-        $url_collection->addItem($url_job);
-
-        $array["url"] = $url_collection;
-        $array["title"] = $offer["title"];
-        $array["company"] = "";
-        $array["city"] = $city;
-        $array["post_time"] = new DateTime($offer["last_refresh_time"]);
-
-        $salary = "";
-        $contract = "";
-        foreach ($offer["params"] as $key => $value) {
-            switch ($value["key"]) {
-              case 'salary':
-                $salary = $value["name"]." ";
-                $salary .= $value["value"]["from"]." - ".$value["value"]["to"];
-                break;
-              case 'contract':
-                $contract = $value["value"]["label"];
-                break;
-          }
-        }
-
-        $array["salary"] = $salary;
-        $array["contract_type"] = $contract;
-
-        $array["technology"] = [];
-        $array["exp"] = "";
-
-        return $array;
     }
 
     /**

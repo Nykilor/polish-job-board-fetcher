@@ -3,6 +3,8 @@ namespace PolishItJobBoardFetcher\Model;
 
 use JsonSerializable;
 
+use PolishItJobBoardFetcher\Model\Collection\LocationCollection;
+
 /**
  * URL class
  */
@@ -21,10 +23,10 @@ class Url implements JsonSerializable
     private $title;
 
     /**
-     * The city that the url refers too
-     * @var string
+     * The city that the offer url refers too
+     * @var LocationCollection|null
      */
-    private $city = "";
+    private $location = null;
 
     /**
      * Implementation of JsonSerializable
@@ -90,26 +92,28 @@ class Url implements JsonSerializable
         return $this;
     }
 
+
+
     /**
      * Get the value of The city that the url refers too
      *
-     * @return string|null
+     * @return LocationCollection|null
      */
-    public function getCity()
+    public function getLocation()
     {
-        return $this->city;
+        return $this->location;
     }
 
     /**
      * Set the value of The city that the url refers too
      *
-     * @param string city
+     * @param Location|null location
      *
      * @return self
      */
-    public function setCity(string $city)
+    public function setLocation(?LocationCollection $location)
     {
-        $this->city = $city;
+        $this->location = $location;
 
         return $this;
     }

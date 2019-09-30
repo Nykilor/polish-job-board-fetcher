@@ -1,6 +1,6 @@
 <?php
 namespace PolishItJobBoardFetcher\Exception;
 
-class ReduxInitialStateNotFound extends \Exception
+class ReduxInitialStateNotFoundException extends \Exception
 {
 }

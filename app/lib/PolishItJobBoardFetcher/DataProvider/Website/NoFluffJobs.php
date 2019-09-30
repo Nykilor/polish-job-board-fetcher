@@ -2,36 +2,44 @@
 
 namespace PolishItJobBoardFetcher\DataProvider\Website;
 
-use DateTime;
 use Exception;
+use Generator;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 
+use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
-use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
+use PolishItJobBoardFetcher\Factory\Normalizer\NoFluffJobsNormalizer;
 
-use PolishItJobBoardFetcher\Model\Url;
+use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
-use PolishItJobBoardFetcher\Model\JobOffer;
-use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
-
-use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
 /**
  * JustJoin.it API call class
  */
-class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
+class NoFluffJobs implements
+    WebsiteInterface,
+    HasJobOfferNormalizerInterface,
+    CategoryQueryFieldInterface,
+    CityQueryFieldInterface,
+    ExperienceQueryFieldInterface,
+    TechnologyQueryFieldInterface
 {
     use ReplacePolishLettersTrait;
     use JobOfferFactoryTrait;
     use WebsiteInterfaceHelperTrait;
 
-    private $url = "https://nofluffjobs.com/";
+    public const URL = "https://nofluffjobs.com/";
 
     private $technology = [
       "javascript" => [
@@ -92,24 +100,6 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         "expert"
     ];
 
-    private $contractType = [];
-
-    /**
-     * Array containing the JobOffers made from the data fetched.
-     * @var JobOfferCollection
-     */
-    private $offers;
-
-    public function __construct()
-    {
-        $this->offers = new JobOfferCollection();
-    }
-
-    public function getUrl() : string
-    {
-        return $this->url;
-    }
-
     public function getTechnology()
     {
         return $this->technology;
@@ -128,11 +118,6 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
     public function getExperience()
     {
         return $this->experience;
-    }
-
-    public function getContractType()
-    {
-        return $this->contractType;
     }
 
     public function allowsCustomTechnology() : bool
@@ -179,21 +164,12 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         return false;
     }
 
-    public function hasContractType(?string $contractType) : bool
-    {
-        return false;
-    }
-
-    public function allowsCustomContractType() : bool
-    {
-        return false;
-    }
-
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
+    public function fetchOffers(Client $client, array $query) : Response
     {
+        $city = $query["city"];
         if (!is_null($city)) {
             $city = $this->replacePolishLetters($city);
 
@@ -203,75 +179,26 @@ class NoFluffJobs implements WebsiteInterface, JobOfferFactoryInterface
         }
 
         $options = [
-          "json" => $this->getRequestBody($technology, $city, $exp, $category)
+          "json" => $this->getRequestBody($query["technology"], $city, $query["experience"], $query["category"])
         ];
 
-        $response = $client->request("POST", $this->url."api/search/posting", $options);
+        $response = $client->request("POST", self::URL."api/search/posting", $options);
 
         return $response;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
-    public function getJobOfferCollection() : JobOfferCollection
+    public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return $this->offers;
+        return new NoFluffJobsNormalizer();
     }
 
-    public function handleResponse(Response $response) : void
+    public function handleResponse(Response $response) : Generator
     {
-        $body = json_decode($response->getBody()->getContents(), true);
+        $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-        foreach ($response["postings"] as $key => $entry_data) {
-            $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($entry_data));
+        foreach ($body["postings"] as $key => $entry_data) {
+            yield $entry_data;
         }
-    }
-
-    /**
-     * Creates a JobOffer from given data array fetched from NoFluffJobs website
-     * @param  array    $entry_data Single offer
-     * @return JobOffer
-     */
-    public function adaptFetchedDataForModelCreation($entry_data) : array
-    {
-        $array = [];
-        $array["title"] = $entry_data["title"];
-        $array["technology"] = [$entry_data["technology"]];
-        $array["exp"] = implode(", ", $entry_data["seniority"]);
-
-        if ($entry_data["locationCount"] > 1) {
-            $city = ($entry_data["fullyRemote"])? ["remote"] : [];
-            foreach ($entry_data["location"]["places"] as $key => $place) {
-                $city[] = $place["city"];
-            }
-            $city = implode(",", $city);
-        } else {
-            $city = $entry_data["location"]["places"][0]["city"];
-        }
-        $array["city"] = $city;
-
-        $url_job = new Url();
-        $url_job->setUrl($this->url."job/".$entry_data["url"]);
-        $url_job->setTitle("offer");
-        $url_job->setCity($city);
-
-        $url_collection = new UrlCollection();
-        $url_collection->addItem($url_job);
-
-        $array["url"] = $url_collection;
-
-        $posted = (isset($entry_data["renewed"]))? $entry_data["renewed"] : $entry_data["posted"];
-        $posted = substr($posted, 0, 10);
-        $date = new DateTime();
-        $date->setTimestamp($posted);
-        $array["post_time"] = $date;
-
-        $array["company"] = $entry_data["name"];
-        $array["salary"] = "";
-        $array["contract_type"] = "";
-
-        return $array;
     }
 
     /**

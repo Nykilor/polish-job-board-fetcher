@@ -2,36 +2,46 @@
 
 namespace PolishItJobBoardFetcher\DataProvider\Website;
 
-use DateTime;
+use Generator;
 
 use GuzzleHttp\Client;
 
 use GuzzleHttp\Psr7\Response;
 
+use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
-use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
+use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
 use PolishItJobBoardFetcher\DataProvider\WebsiteType\Redux;
 
-use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
-use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
+use PolishItJobBoardFetcher\Factory\Normalizer\PracujNormalizer;
 
-use PolishItJobBoardFetcher\Model\Url;
+use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
-use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
 /**
  * JustJoin.it API call class
  */
-class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
+class Pracuj extends Redux implements
+    WebsiteInterface,
+    HasJobOfferNormalizerInterface,
+    CategoryQueryFieldInterface,
+    CityQueryFieldInterface,
+    ContractTypeQueryFieldInterface,
+    ExperienceQueryFieldInterface,
+    TechnologyQueryFieldInterface
 {
-    use JobOfferFactoryTrait;
     use ReplacePolishLettersTrait;
     use WebsiteInterfaceHelperTrait;
 
-    private $url = "https://www.pracuj.pl";
+    public const URL = "https://www.pracuj.pl";
 
     private $technology = [];
 
@@ -80,22 +90,6 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
         "b2b"
       ]
     ];
-
-    /**
-     * Array containing the JobOffers made from the data fetched.
-     * @var JobOfferCollection
-     */
-    private $offers;
-
-    public function __construct()
-    {
-        $this->offers = new JobOfferCollection();
-    }
-
-    public function getUrl() : string
-    {
-        return $this->url;
-    }
 
     public function getTechnology()
     {
@@ -175,70 +169,26 @@ class Pracuj extends Redux implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
+    public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", $this->url."/praca".$this->createQueryUrl($technology, $city, $exp, $category, $contract_type));
+        $response = $client->request("GET", self::URL."/praca".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"]));
 
         return $response;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
-    public function getJobOfferCollection() : JobOfferCollection
+    public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return $this->offers;
+        return new PracujNormalizer();
     }
 
-    /**
-     * Implementation of JobOfferFactoryInterface
-     */
-    public function adaptFetchedDataForModelCreation($entry_data) : array
-    {
-        $array = [];
-        $array["title"] = $entry_data["jobTitle"];
-        $array["technology"] = [];
-        $array["exp"] = $entry_data["employmentLevel"];
-
-        $url_collection_model = new UrlCollection();
-
-        $url_company = new Url();
-        $url_company->setUrl($entry_data["companyProfileUrl"]);
-        $url_company->setTitle("company_homepage_middleman");
-
-        $url_collection_model->addItem($url_company);
-
-        $city = [];
-        foreach ($entry_data["offers"] as $single_offer) {
-            $url_job = new Url();
-            $url_job->setUrl($this->url.$single_offer["offerUrl"]);
-            $url_job->setTitle("offer");
-            $url_job->setCity($single_offer["label"]);
-
-            $city[] = $single_offer["label"];
-
-            $url_collection_model->addItem($url_job);
-        }
-
-        $array["post_time"] = new DateTime($entry_data["lastPublicated"]);
-        $array["company"] = $entry_data["employer"];
-        $array["salary"] = $entry_data["salary"];
-
-        $array["url"] = $url_collection_model;
-        $array["city"] = implode(",", $city);
-        $array["contract_type"] = implode(",", $entry_data["typesOfContract"]);
-
-        return $array;
-    }
-
-    public function handleResponse(Response $response) : void
+    public function handleResponse(Response $response) : Generator
     {
         $body = $response->getBody()->getContents();
 
         $this->setInitialStateFromHtml($body);
 
         foreach ($this->getInitialState()["offers"] as $key => $offer) {
-            $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer));
+            yield $offer;
         }
     }
 

@@ -15,17 +15,13 @@ class JobOffer implements JsonSerializable
      */
     private $title;
     /**
-     * @var string
+     * @var string|null
      */
-    private $exp;
+    private $exp = null;
     /**
      * @var array
      */
     private $technology;
-    /**
-     * @var string
-     */
-    private $city;
     /**
      * @var UrlCollection
      */
@@ -41,14 +37,14 @@ class JobOffer implements JsonSerializable
     private $company;
 
     /**
-     * @var string
+     * @var Salary|null
      */
-    private $salary;
+    private $salary = null;
 
     /**
-     * @var string
+     * @var string|null
      */
-    private $contractType;
+    private $contractType = null;
 
     /**
      * Implementation of JsonSerializable
@@ -86,7 +82,7 @@ class JobOffer implements JsonSerializable
     /**
      * Get the value of Exp
      *
-     * @return string
+     * @return string|null
      */
     public function getExp()
     {
@@ -96,11 +92,11 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Exp
      *
-     * @param string exp
+     * @param string|null exp
      *
      * @return self
      */
-    public function setExp($exp) : self
+    public function setExp(?string $exp) : self
     {
         $this->exp = $exp;
 
@@ -127,30 +123,6 @@ class JobOffer implements JsonSerializable
     public function setTechnology(array $technology) : self
     {
         $this->technology = $technology;
-
-        return $this;
-    }
-
-    /**
-     * Get the value of City
-     *
-     * @return string
-     */
-    public function getCity()
-    {
-        return $this->city;
-    }
-
-    /**
-     * Set the value of City
-     *
-     * @param string city
-     *
-     * @return self
-     */
-    public function setCity(string $city) : self
-    {
-        $this->city = $city;
 
         return $this;
     }
@@ -230,7 +202,7 @@ class JobOffer implements JsonSerializable
     /**
      * Get the value of Salary
      *
-     * @return string
+     * @return string|null
      */
     public function getSalary()
     {
@@ -240,11 +212,11 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Salary
      *
-     * @param string salary
+     * @param Salary|null salary
      *
      * @return self
      */
-    public function setSalary(string $salary) : self
+    public function setSalary(?Salary $salary) : self
     {
         $this->salary = $salary;
 
@@ -254,7 +226,7 @@ class JobOffer implements JsonSerializable
     /**
      * Get the value of Contract Type
      *
-     * @return string
+     * @return string|null
      */
     public function getContractType()
     {
@@ -264,11 +236,11 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Contract Type
      *
-     * @param string contractType
+     * @param string|null contractType
      *
      * @return self
      */
-    public function setContractType(string $contractType) : self
+    public function setContractType(?string $contractType) : self
     {
         $this->contractType = $contractType;
 

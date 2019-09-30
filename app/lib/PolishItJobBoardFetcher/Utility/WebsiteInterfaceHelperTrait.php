@@ -6,28 +6,6 @@ namespace PolishItJobBoardFetcher\Utility;
  */
 trait WebsiteInterfaceHelperTrait
 {
-    public function getAdaptedNameFromArray(array $array, string $look_for) : ?string
-    {
-        foreach ($array as $key => $category_depth1) {
-            if (is_array($category_depth1)) {
-                if ($key === $look_for) {
-                    return $key;
-                }
-                foreach ($category_depth1 as $category_depth2) {
-                    if ($look_for === $category_depth2) {
-                        return $key;
-                    }
-                }
-            } elseif ($category_depth1 === $look_for) {
-                return $look_for;
-            } elseif (is_string($category_depth1) && $category_depth1 === $look_for) {
-                return $category_depth1;
-            }
-        }
-
-        return null;
-    }
-
     /**
      * Check the array if it has the string
      * @param  array   $array    ["key" => ["value", "value"] ... ]

@@ -2,33 +2,42 @@
 
 namespace PolishItJobBoardFetcher\DataProvider\Website;
 
-use DateTime;
+use Generator;
 
 use GuzzleHttp\Client;
 
 use GuzzleHttp\Psr7\Response;
 
+use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
-use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
-use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
+use PolishItJobBoardFetcher\Factory\Normalizer\JustJoinItNormalizer;
 
-use PolishItJobBoardFetcher\Model\Url;
+use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
-use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
-
-use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
 /**
  * JustJoin.it API call class
  */
-class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
+class JustJoinIt implements
+    WebsiteInterface,
+    HasJobOfferNormalizerInterface,
+    CategoryQueryFieldInterface,
+    CityQueryFieldInterface,
+    ContractTypeQueryFieldInterface,
+    ExperienceQueryFieldInterface,
+    TechnologyQueryFieldInterface
 {
-    use JobOfferFactoryTrait;
     use WebsiteInterfaceHelperTrait;
 
-    private $url = "https://justjoin.it/";
+    public const URL = "https://justjoin.it/";
 
     private $technology = [
       "javascript" => [
@@ -84,24 +93,7 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
       "mandate_contract"
     ];
 
-    /**
-     * Array containing the JobOffers made from the data fetched.
-     * @var JobOfferCollection
-     */
-    private $offers;
-
     protected $variables = [];
-
-
-    public function __construct()
-    {
-        $this->offers = new JobOfferCollection();
-    }
-
-    public function getUrl() : string
-    {
-        return $this->url;
-    }
 
     public function getTechnology()
     {
@@ -185,72 +177,23 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
+    public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", $this->url."api/offers");
-        $this->variables["technology"] = $technology;
-        $this->variables["city"] = $city;
-        $this->variables["exp"] = $exp;
-        $this->variables["category"] = $category;
-        $this->variables["contract_type"] = $contract_type;
+        $response = $client->request("GET", self::URL."api/offers");
+        $this->variables = $query;
 
         return $response;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
-    public function getJobOfferCollection() : JobOfferCollection
+    public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return $this->offers;
+        return new JustJoinItNormalizer();
     }
 
-    /**
-     * Implementation of JobOfferFactoryInterface
-     */
-    public function adaptFetchedDataForModelCreation($entry_data) : array
+    public function handleResponse(Response $response) : Generator
     {
-        $array = [];
-        $array["title"] = $entry_data["title"];
+        $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-        $array["technology"] = array_map(function ($entry) {
-            return $entry["name"];
-        }, $entry_data["skills"]);
-        $city = ($entry_data["remote"]) ? "Remote" : $entry_data["city"];
-
-        $url_job = new Url();
-        $url_job->setUrl($this->url."offers/".$entry_data["id"]);
-        $url_job->setTitle("offer");
-        $url_job->setCity($city);
-
-        $url_company = new Url();
-        $url_company->setUrl($entry_data["company_url"]);
-        $url_company->setTitle("company_homepage");
-
-        $url_collection_model = new UrlCollection();
-        $url_collection_model->addItem($url_job);
-        $url_collection_model->addItem($url_company);
-
-        $array["exp"] = $entry_data["experience_level"];
-        $array["url"] = $url_collection_model;
-        $array["city"] = $city;
-        $array["post_time"] = new DateTime($entry_data["published_at"]);
-        $array["company"] = $entry_data["company_name"];
-
-        if (!is_null($entry_data["salary_from"])) {
-            $salary = $entry_data["salary_from"]." - ".$entry_data["salary_to"]." ".$entry_data["salary_currency"];
-        } else {
-            $salary = "";
-        }
-        $array["salary"] = $salary;
-        $array["contract_type"] = $entry_data["employment_type"];
-
-        return $array;
-    }
-
-    public function handleResponse(Response $response) : void
-    {
-        $body = json_decode($response->getBody()->getContents(), true);
         //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs,
         //Because some websites use certain "technologies" of this one as categories we had to split the technology into technology and category
         $look_for_in_marker_icon = [];
@@ -265,10 +208,10 @@ class JustJoinIt implements WebsiteInterface, JobOfferFactoryInterface
 
         foreach ($body as $key => $offer_array) {
             if (is_null($this->variables["city"]) or $this->variables["city"] === strtolower($offer_array["city"]) or ($this->variables["city"] === "remote" && $offer_array["remote"])) {
-                if (is_null($this->variables["exp"]) or $this->variables["exp"] === $offer_array["experience_level"]) {
+                if (is_null($this->variables["experience"]) or $this->variables["experience"] === $offer_array["experience_level"]) {
                     if (empty($look_for_in_marker_icon) or in_array($offer_array["marker_icon"], $look_for_in_marker_icon)) {
                         if (is_null($this->variables["contract_type"]) or strtolower($this->variables["contract_type"]) === $offer_array["employment_type"]) {
-                            $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($offer_array));
+                            yield $offer_array;
                         }
                     }
                 }

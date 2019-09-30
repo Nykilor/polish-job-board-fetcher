@@ -2,37 +2,46 @@
 
 namespace PolishItJobBoardFetcher\DataProvider\Website;
 
-use DateTime;
-use DOMElement;
+use Generator;
 
 use GuzzleHttp\Client;
 
 use GuzzleHttp\Psr7\Response;
 
+use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
-use PolishItJobBoardFetcher\Model\Collection\UrlCollection;
+use PolishItJobBoardFetcher\Factory\Normalizer\BulldogJobNormalizer;
 
-use PolishItJobBoardFetcher\Model\Url;
+use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
-use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
-use PolishItJobBoardFetcher\Model\Collection\JobOfferCollection;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
-use PolishItJobBoardFetcher\DataProvider\JobOfferFactoryInterface;
 
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
  * JustJoin.it API call class
  */
-class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
+class BulldogJob implements
+    WebsiteInterface,
+    HasJobOfferNormalizerInterface,
+    CategoryQueryFieldInterface,
+    CityQueryFieldInterface,
+    ContractTypeQueryFieldInterface,
+    ExperienceQueryFieldInterface,
+    TechnologyQueryFieldInterface
 {
-    use JobOfferFactoryTrait;
     use WebsiteInterfaceHelperTrait;
     use ReplacePolishLettersTrait;
 
-    private $url = "https://bulldogjob.pl/";
+    public const URL = "https://bulldogjob.pl/";
 
     private $technology = [
       "java",
@@ -83,22 +92,6 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
     private $contractType = [];
 
     private $query = [];
-
-    /**
-     * Array containing the JobOffers made from the data fetched.
-     * @var JobOfferCollection
-     */
-    private $offers;
-
-    public function __construct()
-    {
-        $this->offers = new JobOfferCollection();
-    }
-
-    public function getUrl() : string
-    {
-        return $this->url;
-    }
 
     public function getTechnology()
     {
@@ -178,73 +171,26 @@ class BulldogJob implements WebsiteInterface, JobOfferFactoryInterface
     /**
      * Implementation of the WebsiteInterface
      */
-    public function fetchOffers(Client $client, ?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : Response
+    public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", $this->url."companies/jobs".$this->createQueryUrl($technology, $city, $exp, $category));
+        $response = $client->request("GET", self::URL."companies/jobs".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"]));
 
         return $response;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
-    public function getJobOfferCollection() : JobOfferCollection
+    public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return $this->offers;
+        return new BulldogJobNormalizer();
     }
 
-    public function handleResponse(Response $response) : void
+    public function handleResponse(Response $response) : Generator
     {
         $body = $response->getBody()->getContents();
 
         $crawler = new Crawler($body);
         foreach ($crawler->filter(".results-list")->children("li.results-list-item:not(.subscribe-search)") as $dom_element) {
-            $this->offers[] = $this->createJobOfferModel($this->adaptFetchedDataForModelCreation($dom_element));
+            yield $dom_element;
         }
-    }
-
-    /**
-     * Implementation of JobOfferFactoryInterface
-     */
-    public function adaptFetchedDataForModelCreation($dom_element) : array
-    {
-        if (!($dom_element instanceof DOMElement)) {
-            throw new \Exception("Variables has to be an instance of DOMElement class.", 1);
-        }
-
-        $array = [];
-        $crawler = new Crawler($dom_element);
-
-        $city = trim($crawler->filter("span.pop-mobile")->text());
-
-        $url_job = new Url();
-        $url_job->setUrl($dom_element->getAttribute("data-item-url"));
-        $url_job->setTitle("offer");
-        $url_job->setCity($city);
-
-        $url_collection = new UrlCollection();
-        $url_collection->addItem($url_job);
-
-        $array["url"] = $url_collection;
-        $array["title"] = $crawler->filter("a.result-header-name")->text();
-        $array["company"] = trim($crawler->filter("span.pop-black.desktop")->text());
-        $array["city"] = $city;
-        $array["post_time"] = new DateTime($crawler->filter("p.result-desc-meta span.inline-block")->text());
-
-        $salary = $crawler->filter("p.result-desc-meta span.pop-green");
-
-        $array["salary"] = (!is_null($salary->getNode(0))) ? trim($salary->text()) : "";
-
-        $technology = [];
-        foreach ($crawler->filter("ul.tags")->children("li") as $key => $technology_dom_element) {
-            $technology_crawler = new Crawler($technology_dom_element);
-            $technology[] = $technology_crawler->filter("div.btn")->text();
-        }
-        $array["technology"] = $technology;
-        $array["exp"] = "";
-        $array["contract_type"] = "";
-
-        return $array;
     }
 
     /**
