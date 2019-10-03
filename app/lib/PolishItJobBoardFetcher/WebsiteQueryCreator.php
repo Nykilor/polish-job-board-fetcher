@@ -9,19 +9,20 @@ use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 /**
  * Query class
  */
-class WebsiteQueryCreator
+class WebsiteQueryCreator implements QueryCreatorInterface
 {
     /**
      * @var array
      */
     public $query;
 
-    protected $avaliableQueryVariables = [
+    private $avaliableQueryVariables = [
       "PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface" => "technology",
       "PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface" => "city",
       "PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface" => "experience",
       "PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface" => "category",
-      "PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface" => "contract_type"
+      "PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface" => "contract_type",
+      "PolishItJobBoardFetcher\DataProvider\Fields\SalaryQueryFieldInterface" => "salary"
     ];
 
     public function __construct(array $query)
@@ -77,6 +78,15 @@ class WebsiteQueryCreator
         }
 
         return $query;
+    }
+
+    public function addQueryVariable(string $class_interface, string $variable_name)
+    {
+        if (class_exists($class_interface)) {
+            $this->avaliableQueryVariables[$class_interface] = $variable_name;
+        } else {
+            throw new Exception("Class $class_interface not found");
+        }
     }
 
     /**

@@ -2,19 +2,21 @@
 
 namespace PolishItJobBoardFetcher\DataProvider\Website;
 
-use Exception;
 use Generator;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 
 use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\SalaryQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
 
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
+
+use PolishItJobBoardFetcher\Exception\NotExistingNoFluffJobsBodyKey;
 
 use PolishItJobBoardFetcher\Factory\Normalizer\NoFluffJobsNormalizer;
 
@@ -25,7 +27,7 @@ use PolishItJobBoardFetcher\Utility\JobOfferFactoryTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 
 /**
- * JustJoin.it API call class
+ * NoFluffJobs.it API call class
  */
 class NoFluffJobs implements
     WebsiteInterface,
@@ -33,7 +35,8 @@ class NoFluffJobs implements
     CategoryQueryFieldInterface,
     CityQueryFieldInterface,
     ExperienceQueryFieldInterface,
-    TechnologyQueryFieldInterface
+    TechnologyQueryFieldInterface,
+    SalaryQueryFieldInterface
 {
     use ReplacePolishLettersTrait;
     use JobOfferFactoryTrait;
@@ -88,7 +91,9 @@ class NoFluffJobs implements
     ];
 
     private $experience = [
-        "trainee",
+        "trainee" => [
+          "intern"
+        ],
         "junior",
         "mid" => [
           "regular", "medium"
@@ -99,6 +104,8 @@ class NoFluffJobs implements
         ],
         "expert"
     ];
+
+    private $salary = [];
 
     public function getTechnology()
     {
@@ -118,6 +125,11 @@ class NoFluffJobs implements
     public function getExperience()
     {
         return $this->experience;
+    }
+
+    public function getSalary()
+    {
+        return $this->salary;
     }
 
     public function allowsCustomTechnology() : bool
@@ -164,9 +176,16 @@ class NoFluffJobs implements
         return false;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
+    public function hasSalary(?int $salary) : bool
+    {
+        return false;
+    }
+
+    public function allowsCustomSalary() : bool
+    {
+        return true;
+    }
+
     public function fetchOffers(Client $client, array $query) : Response
     {
         $city = $query["city"];
@@ -179,7 +198,7 @@ class NoFluffJobs implements
         }
 
         $options = [
-          "json" => $this->getRequestBody($query["technology"], $city, $query["experience"], $query["category"])
+          "json" => $this->getRequestBody($query["technology"], $city, $query["experience"], $query["category"], $query["salary"])
         ];
 
         $response = $client->request("POST", self::URL."api/search/posting", $options);
@@ -207,9 +226,10 @@ class NoFluffJobs implements
      * @param  string|null $city       Query
      * @param  string|null $exp        Query
      * @param  string|null $category   Query
+     * @param  int|null    $salary     Query
      * @return array              Returns the $body
      */
-    private function getRequestBody(?string $technology, ?string $city, ?string $exp, ?string $category) : array
+    private function getRequestBody(?string $technology, ?string $city, ?string $exp, ?string $category, ?int $salary) : array
     {
         $body = [
           "criteriaSearch" => [
@@ -233,6 +253,14 @@ class NoFluffJobs implements
           ]
         ];
 
+        if (!is_null($salary)) {
+            $body["salary"] = [
+            "currency" => "pln",
+            "greaterThan" => $salary,
+            "period" => "m"
+          ];
+        }
+
         $body = $this->setSearchCriteriaOnCustomOrPicked($body, "technology", $technology);
         $body = $this->setSearchCriteriaOnCustomOrPicked($body, "city", $city);
         $body = $this->setSearchCriteriaOnCustomOrPicked($body, "exp", $exp);
@@ -244,12 +272,18 @@ class NoFluffJobs implements
     /**
      * Handles the weird body creating that the website uses.
      * @param  array  $body             the request body
-     * @param  string $picked_array_key "technology"|"exp"|"city"
-     * @param  string|null $value            the value for the search query
+     * @param  string $picked_array_key "technology"|"exp"|"city"|"category"
+     * @param  mixed  $value            the value for the search query
      * @return array                    the request body
      */
-    protected function setSearchCriteriaOnCustomOrPicked(array $body, string $picked_array_key, ?string $value) : array
+    protected function setSearchCriteriaOnCustomOrPicked(array $body, string $picked_array_key, $value) : array
     {
+
+        //If the query value is null just return the body
+        if (is_null($value)) {
+            return $body;
+        }
+
         $city_without_polish_letters = array_map(function ($city) {
             return $this->replacePolishLetters($city);
         }, $this->city);
@@ -268,23 +302,20 @@ class NoFluffJobs implements
           "category" => "category"
         ];
 
-        if (!array_key_exists($picked_array_key, $picked)) {
-            throw new Exception("The second variable has to be either: 'technology', 'city' or 'exp'");
-        }
-
-        //If the query value is null just return the body
-        if (is_null($value)) {
-            return $body;
+        if (array_key_exists($picked_array_key, $array_key_to_body_criteria)) {
+            $body_criteria_key = $array_key_to_body_criteria[$picked_array_key];
+        } else {
+            throw new NotExistingNoFluffJobsBodyKey("The key $picked_array_key is not allowed in the query to this website");
         }
 
         if (in_array($value, $picked[$picked_array_key])) {
             if (in_array($picked_array_key, ["exp", "category"])) {
-                $body["criteriaSearch"][$array_key_to_body_criteria[$picked_array_key]] = [$value];
+                $body["criteriaSearch"][$body_criteria_key] = [$value];
             } else {
-                $body["criteriaSearch"][$array_key_to_body_criteria[$picked_array_key]]["picked"] = [$value];
+                $body["criteriaSearch"][$body_criteria_key]["picked"] = [$value];
             }
         } else {
-            $body["criteriaSearch"][$array_key_to_body_criteria[$picked_array_key]]["custom"] = [$value];
+            $body["criteriaSearch"][$body_criteria_key]["custom"] = [$value];
         }
 
         return $body;

@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 
 use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\SalaryQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
@@ -27,7 +28,7 @@ use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
 /**
- * JustJoin.it API call class
+ * Pracuj.pl webstie redux scrapping class
  */
 class Pracuj extends Redux implements
     WebsiteInterface,
@@ -36,7 +37,8 @@ class Pracuj extends Redux implements
     CityQueryFieldInterface,
     ContractTypeQueryFieldInterface,
     ExperienceQueryFieldInterface,
-    TechnologyQueryFieldInterface
+    TechnologyQueryFieldInterface,
+    SalaryQueryFieldInterface
 {
     use ReplacePolishLettersTrait;
     use WebsiteInterfaceHelperTrait;
@@ -91,6 +93,8 @@ class Pracuj extends Redux implements
       ]
     ];
 
+    private $salary = [];
+
     public function getTechnology()
     {
         return $this->technology;
@@ -114,6 +118,11 @@ class Pracuj extends Redux implements
     public function getContractType()
     {
         return $this->contractType;
+    }
+
+    public function getSalary()
+    {
+        return $this->salary;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -166,12 +175,19 @@ class Pracuj extends Redux implements
         return false;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
+    public function hasSalary(?int $salary) : bool
+    {
+        return false;
+    }
+
+    public function allowsCustomSalary() : bool
+    {
+        return true;
+    }
+
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."/praca".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"]));
+        $response = $client->request("GET", self::URL."/praca".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"], $query["salary"]));
 
         return $response;
     }
@@ -187,13 +203,24 @@ class Pracuj extends Redux implements
 
         $this->setInitialStateFromHtml($body);
 
-        foreach ($this->getInitialState()["offers"] as $key => $offer) {
+        $initial_state = json_decode(substr($this->getInitialState(), 0, -3), true, 512, JSON_THROW_ON_ERROR);
+        
+        foreach ($initial_state["offers"] as $key => $offer) {
             yield $offer;
         }
     }
 
-
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : string
+    /**
+     * Creates the query url for this website.
+     * @param  ?string $technology
+     * @param  ?string $city
+     * @param  ?string $exp
+     * @param  ?string $category
+     * @param  ?string $contract_type
+     * @param  ?int    $salary
+     * @return string                 The last portion of the url
+     */
+    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type, ?int $salary) : string
     {
         $first_part = (is_null($technology))? "" : "/$technology";
         $second_part = "";
@@ -235,20 +262,32 @@ class Pracuj extends Redux implements
             $category_string = $category;
         }
 
-        if (strpos($second_part, "?et=4") !== false) {
-            $url .= "&cc=".$category_string;
-        } else {
-            $url .= "?cc=".$category_string;
-        }
+        $url = $this->addGetVariableToUrl($url, "cc", $category_string);
 
         if (!is_null($contract_type)) {
-            if (strpos($url, "?") !== false) {
-                $url .= "tc=".$contract_type;
-            } else {
-                $url .= "?tc=".$contract_type;
-            }
+            $url = $this->addGetVariableToUrl($url, "tc", $contract_type);
+        }
+
+        if (!is_null($salary)) {
+            $url = $this->addGetVariableToUrl($url, "sal", $salary);
         }
 
         return $url;
+    }
+
+    /**
+     * Adds a variable to the $_GET portion of the url
+     * @param  string $url   The url to append the variable to
+     * @param  string $key   The $_GET[$key]
+     * @param  mixed  $value
+     * @return string        Returns the $url with added variable
+     */
+    protected function addGetVariableToUrl(string $url, string $key, $value) : string
+    {
+        if (strpos($url, "?") === false) {
+            return $url."?".$key."=".$value;
+        } else {
+            return $url."&".$key."=".$value;
+        }
     }
 }

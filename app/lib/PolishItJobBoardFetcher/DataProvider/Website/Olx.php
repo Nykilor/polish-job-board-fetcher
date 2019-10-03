@@ -25,7 +25,7 @@ use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 
 /**
- * olx.pl API call class
+ * Olx.pl API call class
  */
 class Olx implements
     WebsiteInterface,
@@ -168,9 +168,6 @@ class Olx implements
         return false;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
     public function fetchOffers(Client $client, array $query) : Response
     {
         $response = $client->request("GET", self::URL."api/v1/offers/?".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"]));

@@ -52,7 +52,7 @@ class NoFluffJobsNormalizer implements WebsiteOfferDataNormalizerInterface
 
         $array["company"] = $entry_data["name"];
         $array["salary"] = null;
-        $array["contract_type"] = "";
+        $array["contract_type"] = null;
 
         return $array;
     }

@@ -9,6 +9,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Response;
 
 use PolishItJobBoardFetcher\DataProvider\Fields\CityQueryFieldInterface;
+use PolishItJobBoardFetcher\DataProvider\Fields\SalaryQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\CategoryQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
@@ -27,7 +28,7 @@ use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use Symfony\Component\DomCrawler\Crawler;
 
 /**
- * JustJoin.it API call class
+ * BulldogJob.pl website scraping
  */
 class BulldogJob implements
     WebsiteInterface,
@@ -36,7 +37,8 @@ class BulldogJob implements
     CityQueryFieldInterface,
     ContractTypeQueryFieldInterface,
     ExperienceQueryFieldInterface,
-    TechnologyQueryFieldInterface
+    TechnologyQueryFieldInterface,
+    SalaryQueryFieldInterface
 {
     use WebsiteInterfaceHelperTrait;
     use ReplacePolishLettersTrait;
@@ -91,7 +93,7 @@ class BulldogJob implements
 
     private $contractType = [];
 
-    private $query = [];
+    private $salary = [];
 
     public function getTechnology()
     {
@@ -116,6 +118,11 @@ class BulldogJob implements
     public function getContractType()
     {
         return $this->contractType;
+    }
+
+    public function getSalary()
+    {
+        return $this->salary;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -168,12 +175,19 @@ class BulldogJob implements
         return false;
     }
 
-    /**
-     * Implementation of the WebsiteInterface
-     */
+    public function hasSalary(?int $salary) : bool
+    {
+        return false;
+    }
+
+    public function allowsCustomSalary() : bool
+    {
+        return true;
+    }
+
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."companies/jobs".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"]));
+        $response = $client->request("GET", self::URL."companies/jobs".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["salary"]));
 
         return $response;
     }
@@ -199,9 +213,10 @@ class BulldogJob implements
      * @param  string|null $city
      * @param  string|null $exp
      * @param  string|null $category
+     * @param  int|null    $salary
      * @return string              URL for query
      */
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category) : string
+    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?int $salary) : string
     {
         if (is_null($technology) && is_null($city) && is_null($exp) && is_null($category)) {
             return "";
@@ -232,6 +247,10 @@ class BulldogJob implements
 
         if (!is_null($category)) {
             $query .= "/role,".$category;
+        }
+
+        if (!is_null($salary)) {
+            $query .= "/salary,".$salary."/with_salary,true";
         }
 
         return $query;

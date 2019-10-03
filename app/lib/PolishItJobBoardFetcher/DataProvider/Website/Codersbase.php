@@ -18,16 +18,18 @@ use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
-use PolishItJobBoardFetcher\Factory\Normalizer\JustJoinItNormalizer;
+use PolishItJobBoardFetcher\DataProvider\WebsiteType\Redux;
+use PolishItJobBoardFetcher\Factory\Normalizer\CodersbaseNormalizer;
 
 use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
+use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
 /**
- * JustJoin.it API call class
+ * Pracuj.pl webstie redux scrapping class
  */
-class JustJoinIt implements
+class Codersbase extends Redux implements
     WebsiteInterface,
     HasJobOfferNormalizerInterface,
     CategoryQueryFieldInterface,
@@ -37,29 +39,35 @@ class JustJoinIt implements
     TechnologyQueryFieldInterface,
     SalaryQueryFieldInterface
 {
+    use ReplacePolishLettersTrait;
     use WebsiteInterfaceHelperTrait;
 
-    public const URL = "https://justjoin.it/";
+    public const URL = "https://www.codersbase.it";
 
     private $technology = [
       "javascript" => [
         "js"
       ],
-      "html", "php",
-      "ruby", "python", "java",
-      ".net", "scala", "c",
-      "golang", "sap", "other"
+      "php", "ruby", "python",
+      "java", ".net", "scala",
+      "c", "golang", "sap",
+      "other"
     ];
 
     private $city = [
-      "warszawa", "kraków", "wrocław",
-      "poznań", "trójmiasto", "sopot",
-      "gdynia", "gdańsk", "remote",
-      "world", "białystok", "bielsko-biała",
-      "bydgoszcz", "częstochowa", "gliwice",
-      "katowice", "kielce", "lublin",
-      "łódź", "olsztyn", "opole",
-      "toruń", "rzeszów", "szczecin"
+      "remote",
+      "warszawa",
+      "kraków",
+      "wrocław",
+      "poznań",
+      "trójmiasto",
+      "łódź",
+      "katowice",
+      "szczecin",
+      "rzeszów",
+      "białystok",
+      "gliwice",
+      "bielsko-biała"
     ];
 
     private $category = [
@@ -72,32 +80,30 @@ class JustJoinIt implements
       "pm" => [
         "project_manager", "project manager", "project-manager"
       ],
-      "game",
-      "security",
-      "blockchain",
-      "data",
     ];
 
     private $experience = [
         "junior",
         "mid" => [
-          "regular", "medium"
+          "medium",
+          "regular",
+          "mid"
         ],
         "senior" => [
           "specjalista",
           "specialist"
+        ],
+        "intern" => [
+          "trainee"
         ]
     ];
 
     private $contractType = [
       "b2b",
       "permanent",
-      "mandate_contract"
     ];
 
     private $salary = [];
-
-    protected $variables = [];
 
     public function getTechnology()
     {
@@ -151,11 +157,7 @@ class JustJoinIt implements
 
     public function hasCity(?string $city) : bool
     {
-        if (!is_null($city) && in_array(strtolower($city), $this->city)) {
-            return true;
-        } else {
-            return false;
-        }
+        return $this->arrayContains($this->city, $city);
     }
 
     public function allowsCustomCity() : bool
@@ -195,45 +197,28 @@ class JustJoinIt implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."api/offers");
-        $this->variables = $query;
+        $response = $client->request("GET", self::URL);
 
         return $response;
     }
 
     public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return new JustJoinItNormalizer();
+        return new CodersbaseNormalizer();
     }
 
     public function handleResponse(Response $response) : Generator
     {
-        $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
+        $body = $response->getBody()->getContents();
 
-        //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs,
-        //Because some websites use certain "technologies" of this one as categories we had to split the technology into technology and category
-        $look_for_in_marker_icon = [];
-
-        if (!is_null($this->variables["category"])) {
-            $look_for_in_marker_icon[] = strtolower($this->variables["category"]);
-        }
-
-        if (!is_null($this->variables["technology"])) {
-            $look_for_in_marker_icon[] = strtolower($this->variables["technology"]);
-        }
-
-        foreach ($body as $key => $offer_array) {
-            if (is_null($this->variables["city"]) or $this->variables["city"] === strtolower($offer_array["city"]) or ($this->variables["city"] === "remote" && $offer_array["remote"])) {
-                if (is_null($this->variables["experience"]) or $this->variables["experience"] === $offer_array["experience_level"]) {
-                    if (empty($look_for_in_marker_icon) or in_array($offer_array["marker_icon"], $look_for_in_marker_icon)) {
-                        if (is_null($this->variables["contract_type"]) or strtolower($this->variables["contract_type"]) === $offer_array["employment_type"]) {
-                            if (is_null($this->variables["salary"]) or $this->variables["salary"] >= $offer_array["salary_from"]) {
-                                yield $offer_array;
-                            }
-                        }
-                    }
-                }
-            }
+        $this->setInitialStateFromHtml($body);
+        var_dump(preg_replace('/\\\\/', "", $this->getInitialState()));
+        exit();
+        $initial_state = json_decode(substr($this->getInitialState(), 0, -2), true, 512, JSON_THROW_ON_ERROR);
+        var_dump($initial_state);
+        exit();
+        foreach ($initial_state["offers"] as $key => $offer) {
+            yield $offer;
         }
     }
 }

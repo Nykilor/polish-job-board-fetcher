@@ -13,7 +13,7 @@ class Redux
     private $initialState = null;
 
     /**
-     * Uses the crawler and regex to get the window.__INITIAL_STATE__ variable
+     * Uses the Symfony\Component\DomCrawler\Crawler and regex to get the window.__INITIAL_STATE__ variable
      * @param string $body HTML string body.
      */
     public function setInitialStateFromHtml(string $body) : void
@@ -44,12 +44,11 @@ class Redux
 
         $json = $json[0];
         //My regex is not perfect, we have to fix it by omiting few chars
-        $valid_json = substr($json, 2, -3);
-
-        $this->initialState = json_decode($valid_json, true, 512, JSON_THROW_ON_ERROR);
+        $json = substr($json, 2);
+        $this->initialState = $json;
     }
 
-    public function getInitialState() : array
+    public function getInitialState() : string
     {
         return $this->initialState;
     }
