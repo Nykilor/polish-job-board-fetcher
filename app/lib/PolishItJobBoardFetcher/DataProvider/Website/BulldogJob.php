@@ -60,7 +60,9 @@ class BulldogJob implements
     private $category = [
       "backend", "fullstack", "frontend",
       "devops", "analyst", "administrator",
-      "tester",
+      "tester" => [
+        "test", "testing", "testers"
+      ],
       "project_manager" => [
         "pm", "project manager", "project-manager"
       ],

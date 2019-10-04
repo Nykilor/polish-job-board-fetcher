@@ -54,7 +54,8 @@ class Pracuj extends Redux implements
         "devops", "analyst", "analityk",
         "administrator", "support", "wsparcie",
         "project_manager", "pm", "project manager",
-        "project-manager", "tester", "tech_lead",
+        "project-manager", "testing", "test",
+        "tester", "testers", "tech_lead",
         "tl", "team leader", "tech lead",
         "scrum_master", "scrum", "sm",
         "agile coach",
@@ -204,7 +205,7 @@ class Pracuj extends Redux implements
         $this->setInitialStateFromHtml($body);
 
         $initial_state = json_decode(substr($this->getInitialState(), 0, -3), true, 512, JSON_THROW_ON_ERROR);
-        
+
         foreach ($initial_state["offers"] as $key => $offer) {
             yield $offer;
         }

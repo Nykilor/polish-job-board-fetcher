@@ -16,7 +16,10 @@ use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
 
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\QueryClassPropertyInterface;
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
+
+use PolishItJobBoardFetcher\Exception\EmptyQueryPropertyException;
 
 use PolishItJobBoardFetcher\Factory\Normalizer\JustJoinItNormalizer;
 
@@ -35,7 +38,8 @@ class JustJoinIt implements
     ContractTypeQueryFieldInterface,
     ExperienceQueryFieldInterface,
     TechnologyQueryFieldInterface,
-    SalaryQueryFieldInterface
+    SalaryQueryFieldInterface,
+    QueryClassPropertyInterface
 {
     use WebsiteInterfaceHelperTrait;
 
@@ -97,7 +101,7 @@ class JustJoinIt implements
 
     private $salary = [];
 
-    protected $variables = [];
+    protected $query = [];
 
     public function getTechnology()
     {
@@ -127,6 +131,16 @@ class JustJoinIt implements
     public function getSalary()
     {
         return $this->salary;
+    }
+
+    public function getQuery() : array
+    {
+        return $this->query;
+    }
+
+    public function setQuery(array $query) : void
+    {
+        $this->query = $query;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -196,7 +210,6 @@ class JustJoinIt implements
     public function fetchOffers(Client $client, array $query) : Response
     {
         $response = $client->request("GET", self::URL."api/offers");
-        $this->variables = $query;
 
         return $response;
     }
@@ -208,26 +221,33 @@ class JustJoinIt implements
 
     public function handleResponse(Response $response) : Generator
     {
+        if (empty($this->query)) {
+            throw new EmptyQueryPropertyException("You need first too set the query property by using setQuery()");
+        }
+
         $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
         //Because JustJoin.it returns every offer they have with a single api call we need to filter what we want by ourselfs,
         //Because some websites use certain "technologies" of this one as categories we had to split the technology into technology and category
         $look_for_in_marker_icon = [];
 
-        if (!is_null($this->variables["category"])) {
-            $look_for_in_marker_icon[] = strtolower($this->variables["category"]);
+        if (!is_null($this->query["category"])) {
+            $look_for_in_marker_icon[] = strtolower($this->query["category"]);
         }
 
-        if (!is_null($this->variables["technology"])) {
-            $look_for_in_marker_icon[] = strtolower($this->variables["technology"]);
+        if (!is_null($this->query["technology"])) {
+            $look_for_in_marker_icon[] = strtolower($this->query["technology"]);
         }
 
         foreach ($body as $key => $offer_array) {
-            if (is_null($this->variables["city"]) or $this->variables["city"] === strtolower($offer_array["city"]) or ($this->variables["city"] === "remote" && $offer_array["remote"])) {
-                if (is_null($this->variables["experience"]) or $this->variables["experience"] === $offer_array["experience_level"]) {
+            if (is_null($this->query["city"]) or $this->query["city"] === strtolower($offer_array["city"]) or ($this->query["city"] === "remote" && $offer_array["remote"])) {
+                if (is_null($this->query["experience"]) or $this->query["experience"] === $offer_array["experience_level"]) {
                     if (empty($look_for_in_marker_icon) or in_array($offer_array["marker_icon"], $look_for_in_marker_icon)) {
-                        if (is_null($this->variables["contract_type"]) or strtolower($this->variables["contract_type"]) === $offer_array["employment_type"]) {
-                            if (is_null($this->variables["salary"]) or $this->variables["salary"] >= $offer_array["salary_from"]) {
+                        if (is_null($this->query["contract_type"]) or strtolower($this->query["contract_type"]) === $offer_array["employment_type"]) {
+                            if (is_null($this->query["salary"]) or
+                                $this->query["salary"] <= $offer_array["salary_from"] or
+                                $this->query["salary"] <= $offer_array["salary_to"]
+                              ) {
                                 yield $offer_array;
                             }
                         }

@@ -69,7 +69,11 @@ class NoFluffJobs implements
 
     private $category = [
       "backend", "frontend", "fullstack",
-      "mobile", "testing", "devops",
+      "mobile",
+      "testing" => [
+        "test", "tester", "testers"
+      ],
+      "devops",
       "project-manager" => [
           "pm", "project manager"
       ],

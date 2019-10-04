@@ -3,7 +3,7 @@ namespace PolishItJobBoardFetcher\Factory\Normalizer;
 
 use DateTime;
 
-use PolishItJobBoardFetcher\DataProvider\Website\Pracuj;
+use PolishItJobBoardFetcher\DataProvider\Website\Codersbase;
 
 use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
@@ -14,77 +14,65 @@ use PolishItJobBoardFetcher\Model\Url;
 use PolishItJobBoardFetcher\Model\Salary;
 use PolishItJobBoardFetcher\Model\Location;
 
-use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
-
 class CodersbaseNormalizer implements WebsiteOfferDataNormalizerInterface
 {
     public function normalize($entry_data) : array
     {
         $array = [];
-        $array["title"] = $entry_data["jobTitle"];
-        $array["technology"] = [];
-        $array["exp"] = $entry_data["employmentLevel"];
+        $array["title"] = $entry_data["title"];
+        $array["technology"] = array_keys($entry_data["requiredSkills"]);
+        $array["exp"] = $entry_data["experienceLevel"];
 
         $url_collection_model = new UrlCollection();
+        $location_collection = new LocationCollection();
 
-        $url_company = new Url();
-        $url_company->setUrl($entry_data["companyProfileUrl"]);
-        $url_company->setTitle("company_homepage_middleman");
+        $location = new Location();
+        $location->setAdress($entry_data["officeCity"].", ".$entry_data["officeStreet"]);
+        $location->setLatitude($entry_data["latitude"]);
+        $location->setLongitude($entry_data["longitude"]);
 
-        $url_collection_model[] = $url_company;
+        $location_collection[] = $location;
 
-        $city = [];
-        foreach ($entry_data["offers"] as $single_offer) {
-            $location_collection = new LocationCollection();
-            $location = new Location();
-            $location->setAdress($single_offer["label"]);
-            if (strlen($single_offer["geoCoordinates"]) > 2) {
-                $geo = explode(", ", $single_offer["geoCoordinates"]);
-                $location->setLatitude($geo[0]);
-                $location->setLongitude($geo[1]);
-            }
+        $url_job = new Url();
+        $url_job->setUrl(Codersbase::URL."/offer"."/".$entry_data["idInc"]);
+        $url_job->setTitle("offer");
+        $url_job->setLocation($location_collection);
 
-            $location_collection[] = $location;
+        $url_collection_model[] = $url_job;
 
-            $url_job = new Url();
-            $url_job->setUrl(Pracuj::URL.$single_offer["offerUrl"]);
-            $url_job->setTitle("offer");
-            $url_job->setLocation($location_collection);
+        $array["post_time"] = new DateTime($entry_data["date"]);
+        $array["company"] = $entry_data["companyName"];
 
-            $url_collection_model[] = $url_job;
-        }
+        $employmentType = $entry_data["employmentType"];
 
-        $array["post_time"] = new DateTime($entry_data["lastPublicated"]);
-        $array["company"] = $entry_data["employer"];
-
-        $salary = null;
-
-        if (!empty($entry_data["salary"])) {
-            //They use some escaping, you can check for yourself by going print bin2hex($salary_string)
-            //and visiting f.i. https://codebeautify.org/hex-string-converter
-            $salary_string = str_replace(["&nbsp;", "&#322;", "&ndash;"], ["", "ł", "-"], $entry_data["salary"]);
-
-            $salary_substr = substr($salary_string, 0, strpos($salary_string, "zł"));
-
-            $salary_from_to = explode("-", $salary_substr);
-
+        if (isset($entry_data["salaryFrom"])) {
             $salary = new Salary();
-            $salary->setFrom($salary_from_to[0]);
-            $salary->setTo($salary_from_to[1]);
-            $salary->setGross(true);
+            $salary->setFrom($entry_data["salaryFrom"]);
+            $salary->setTo($entry_data["salaryTo"]);
 
-            $is_hourly = (strpos($salary_string, "godz") !== false) ? true : false;
-
-            if ($is_hourly) {
-                $salary->setPeriod("hour");
+            if ($employmentType === "b2b") {
+                $salary->setGross(false);
+            } elseif ($employmentType === "permanent") {
+                $salary->setGross(true);
+            } else {
+                $salary->setGross(null);
             }
+
+            $salary->setCurrency($entry_data["currency"]);
+        } else {
+            $salary = null;
         }
 
 
         $array["salary"] = $salary;
 
         $array["url"] = $url_collection_model;
-        $array["contract_type"] = implode(",", $entry_data["typesOfContract"]);
+
+        if ($employmentType === "both") {
+            $employmentType = "b2b/permanent";
+        }
+
+        $array["contract_type"] = $employmentType;
 
         return $array;
     }

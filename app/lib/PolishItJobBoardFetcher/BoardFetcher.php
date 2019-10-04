@@ -4,8 +4,13 @@ namespace PolishItJobBoardFetcher;
 use GuzzleHttp\Client;
 
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\QueryClassPropertyInterface;
 
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
+
+use PolishItJobBoardFetcher\Exception\ClassDoesNotExistException;
+use PolishItJobBoardFetcher\Exception\MissingClassPropertyException;
+use PolishItJobBoardFetcher\Exception\ClassMissingInterfaceException;
 
 use PolishItJobBoardFetcher\Factory\JobOfferFactory;
 
@@ -25,14 +30,18 @@ class BoardFetcher
 
     private $queryCreator = [];
 
-    private $response = [];
-
     private $offers;
 
     public function __construct(array $client_config = [])
     {
         $this->client = (!empty($client_config)) ? new Client($client_config) : new Client();
         $this->offers = new JobOfferCollection();
+    }
+
+
+    public function getJobOffersCollection() : JobOfferCollection
+    {
+        return $this->offers;
     }
 
     public function setQuery(array $query)
@@ -46,21 +55,26 @@ class BoardFetcher
             if (class_exists($website)) {
                 $class_instance = new $website;
             } else {
-                throw new \Exception("Array needs to contain an existing class.", 1);
+                throw new ClassDoesNotExistException("$website does not exist.", 1);
             }
 
             if ($class_instance instanceof WebsiteInterface) {
                 $this->websites[] = $class_instance;
             } else {
-                throw new \Exception("Class has to instance of PolishItJobBoardFetcher\DataProvider\Website\WebsiteInterface class.", 1);
+                throw new ClassMissingInterfaceException("Missing PolishItJobBoardFetcher\DataProvider\Website\WebsiteInterface.", 1);
             }
         }
     }
 
     public function fetch(bool $strict = false)
     {
-        if (empty($this->websites) or empty($this->queryCreator)) {
-            throw new \Exception("You need to first setQuery() and setWebsites()", 1);
+        $is_websites_empty = empty($this->websites);
+        $is_query_creator_empty = empty($this->queryCreator);
+        if ($is_websites_empty or $is_query_creator_empty) {
+            $msg = "You need to call";
+            $msg .= ($is_websites_empty) ? " setWebsites()" : "";
+            $msg .= ($is_query_creator_empty) ? " setQuery()" : "";
+            throw new MissingClassPropertyException($msg);
         }
 
         foreach ($this->websites as $key => $class) {
@@ -87,17 +101,15 @@ class BoardFetcher
             $factory = new JobOfferFactory();
 
             if ($class_instance instanceof HasJobOfferNormalizerInterface) {
+                if ($class_instance instanceof QueryClassPropertyInterface) {
+                    $class_instance->setQuery($query);
+                }
                 foreach ($class_instance->handleResponse($response) as $key => $entry_data) {
                     $this->offers[] = $factory->createJobOfferModel($class_instance->getNormalizer(), $entry_data);
                 }
             } else {
-                throw new \Exception("Class has to implement PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface", 1);
+                throw new ClassMissingInterfaceException("Missing PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface.", 1);
             }
         }
-    }
-
-    public function getJobOffersCollection() : JobOfferCollection
-    {
-        return $this->offers;
     }
 }
