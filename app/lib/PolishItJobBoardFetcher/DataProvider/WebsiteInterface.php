@@ -19,5 +19,7 @@ interface WebsiteInterface
      */
     public function fetchOffers(Client $client, array $query) : Response;
 
-    public function handleResponse(Response $response) : Generator;
+    public function createUrl(array $query) : string;
+
+    public function filterOffersFromResponse(Response $response) : Generator;
 }

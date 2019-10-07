@@ -170,7 +170,7 @@ class Olx implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."api/v1/offers/?".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"]));
+        $response = $client->request("GET", $this->createUrl($query));
 
         return $response;
     }
@@ -180,7 +180,7 @@ class Olx implements
         return new OlxNormalizer();
     }
 
-    public function handleResponse(Response $response) : Generator
+    public function filterOffersFromResponse(Response $response) : Generator
     {
         $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
@@ -191,23 +191,18 @@ class Olx implements
         }
     }
 
-    /**
-     * Creates the end of the url that queries the website
-     * @param  string|null $technology
-     * @param  string|null $city
-     * @param  string|null $exp
-     * @param  string|null $category
-     * @return string              URL for query
-     */
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type) : string
+    public function createUrl(array $query) : string
     {
+        //sets up the variables https://www.php.net/manual/en/function.extract.php
+        extract($query);
+
         $url = "offset=0&limit=10&filter_refiners=spell_checker";
 
         $query = (!is_null($technology)) ? $technology : "";
-        if (!is_null($exp) && empty($query)) {
-            $query .= $exp;
+        if (!is_null($experience) && empty($query)) {
+            $query .= $experience;
         } else {
-            $query .= "%20".$exp;
+            $query .= "%20".$experience;
         }
 
         if (!empty($query)) {
@@ -225,6 +220,6 @@ class Olx implements
             $url .= "&filter_enum_contract%5B0%5D=".$contract_type;
         }
 
-        return $url;
+        return self::URL."api/v1/offers/?".$url;
     }
 }

@@ -15,8 +15,10 @@ use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
 
-use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\PaginableWebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
+
+use PolishItJobBoardFetcher\Exception\PageLimitExcededException;
 
 use PolishItJobBoardFetcher\Factory\Normalizer\BulldogJobNormalizer;
 
@@ -31,14 +33,14 @@ use Symfony\Component\DomCrawler\Crawler;
  * BulldogJob.pl website scraping
  */
 class BulldogJob implements
-    WebsiteInterface,
     HasJobOfferNormalizerInterface,
     CategoryQueryFieldInterface,
     CityQueryFieldInterface,
     ContractTypeQueryFieldInterface,
     ExperienceQueryFieldInterface,
     TechnologyQueryFieldInterface,
-    SalaryQueryFieldInterface
+    SalaryQueryFieldInterface,
+    PaginableWebsiteInterface
 {
     use WebsiteInterfaceHelperTrait;
     use ReplacePolishLettersTrait;
@@ -97,6 +99,12 @@ class BulldogJob implements
 
     private $salary = [];
 
+    private $currentPage = null;
+
+    private $pageLimit = null;
+
+    private $currentQueryUrl = null;
+
     public function getTechnology()
     {
         return $this->technology;
@@ -125,6 +133,21 @@ class BulldogJob implements
     public function getSalary()
     {
         return $this->salary;
+    }
+
+    public function getCurrentPage() : int
+    {
+        return $this->currentPage;
+    }
+
+    public function getPageLimit() : int
+    {
+        return $this->pageLimit;
+    }
+
+    public function getCurrentQueryUrl() : string
+    {
+        return $this->currentQueryUrl;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -189,38 +212,54 @@ class BulldogJob implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."companies/jobs".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["salary"]));
+        $response = $client->request("GET", $this->createUrl($query));
+
+        $body = $response->getBody();
+
+        $content = (string) $body;
+        //reset the stream pointer position
+        $body->rewind();
+
+        $this->setPagination(new Crawler($content));
 
         return $response;
     }
+
+    public function fetchOffersPage(Client $client, int $page) : Response
+    {
+        if (is_null($this->pageLimit) or $page > $this->pageLimit) {
+            throw new PageLimitExcededException("You're trying to fetch a non-existing page.");
+        }
+
+        $this->currentPage = $page;
+
+        $response = $client->request("GET", $this->currentQueryUrl."?page=$page");
+
+        return $response;
+    }
+
 
     public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
         return new BulldogJobNormalizer();
     }
 
-    public function handleResponse(Response $response) : Generator
+    public function filterOffersFromResponse(Response $response) : Generator
     {
-        $body = $response->getBody()->getContents();
+        $content = (string) $response->getBody();
 
-        $crawler = new Crawler($body);
+        $crawler = new Crawler($content);
         foreach ($crawler->filter(".results-list")->children("li.results-list-item:not(.subscribe-search)") as $dom_element) {
             yield $dom_element;
         }
     }
 
-    /**
-     * Creates the end of the url that queries the website
-     * @param  string|null $technology
-     * @param  string|null $city
-     * @param  string|null $exp
-     * @param  string|null $category
-     * @param  int|null    $salary
-     * @return string              URL for query
-     */
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?int $salary) : string
+    public function createUrl(array $query) : string
     {
-        if (is_null($technology) && is_null($city) && is_null($exp) && is_null($category)) {
+        //sets up the variables https://www.php.net/manual/en/function.extract.php
+        extract($query);
+
+        if (is_null($technology) && is_null($city) && is_null($experience) && is_null($category)) {
             return "";
         }
 
@@ -243,8 +282,8 @@ class BulldogJob implements
             $query .= "/skills,$technology";
         }
 
-        if (!is_null($exp)) {
-            $query .= "/experience_level,".$exp;
+        if (!is_null($experience)) {
+            $query .= "/experience_level,".$experience;
         }
 
         if (!is_null($category)) {
@@ -255,6 +294,18 @@ class BulldogJob implements
             $query .= "/salary,".$salary."/with_salary,true";
         }
 
-        return $query;
+        $this->currentQueryUrl = self::URL."companies/jobs".$query;
+
+        $this->pageLimit = null;
+        $this->currentPage = null;
+
+        return self::URL."companies/jobs".$query;
+    }
+
+    private function setPagination(Crawler $crawler) : void
+    {
+        $pagination_dom_element = $crawler->filter("section.search-results div.pagination");
+        $this->currentPage = $pagination_dom_element->attr("data-current");
+        $this->pageLimit = $pagination_dom_element->attr("data-total");
     }
 }

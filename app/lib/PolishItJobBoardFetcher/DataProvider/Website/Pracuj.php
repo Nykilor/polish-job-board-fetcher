@@ -15,10 +15,12 @@ use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
 
-use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\PaginableWebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
 use PolishItJobBoardFetcher\DataProvider\WebsiteType\Redux;
+
+use PolishItJobBoardFetcher\Exception\PageLimitExcededException;
 
 use PolishItJobBoardFetcher\Factory\Normalizer\PracujNormalizer;
 
@@ -31,14 +33,14 @@ use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
  * Pracuj.pl webstie redux scrapping class
  */
 class Pracuj extends Redux implements
-    WebsiteInterface,
     HasJobOfferNormalizerInterface,
     CategoryQueryFieldInterface,
     CityQueryFieldInterface,
     ContractTypeQueryFieldInterface,
     ExperienceQueryFieldInterface,
     TechnologyQueryFieldInterface,
-    SalaryQueryFieldInterface
+    SalaryQueryFieldInterface,
+    PaginableWebsiteInterface
 {
     use ReplacePolishLettersTrait;
     use WebsiteInterfaceHelperTrait;
@@ -96,6 +98,12 @@ class Pracuj extends Redux implements
 
     private $salary = [];
 
+    private $currentPage = null;
+
+    private $pageLimit = null;
+
+    private $currentQueryUrl = null;
+
     public function getTechnology()
     {
         return $this->technology;
@@ -124,6 +132,21 @@ class Pracuj extends Redux implements
     public function getSalary()
     {
         return $this->salary;
+    }
+
+    public function getCurrentPage() : ?int
+    {
+        return $this->currentPage;
+    }
+
+    public function getPageLimit() : ?int
+    {
+        return $this->pageLimit;
+    }
+
+    public function getCurrentQueryUrl() : ?string
+    {
+        return $this->currentQueryUrl;
     }
 
     public function hasTechnology(?string $technology) : bool
@@ -188,7 +211,33 @@ class Pracuj extends Redux implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."/praca".$this->createQueryUrl($query["technology"], $query["city"], $query["experience"], $query["category"], $query["contract_type"], $query["salary"]));
+        $response = $client->request("GET", $this->createUrl($query));
+
+        $body = $response->getBody();
+
+        $content = (string) $body;
+
+        $this->setInitialStateFromHtml($content);
+
+        $this->setPagination(json_decode(substr($this->getInitialState(), 0, -3), true, 512, JSON_THROW_ON_ERROR));
+
+        //reset the stream pointer position
+        $body->rewind();
+
+        return $response;
+    }
+
+    public function fetchOffersPage(Client $client, int $page) : Response
+    {
+        if (is_null($this->pageLimit) or $page > $this->pageLimit) {
+            throw new PageLimitExcededException("You're trying to fetch a non-existing page.");
+        }
+
+        $this->currentPage = $page;
+
+        $current_query_url = $this->addGetVariableToUrl($this->currentQueryUrl, "pn", $page);
+
+        $response = $client->request("GET", $current_query_url);
 
         return $response;
     }
@@ -198,11 +247,11 @@ class Pracuj extends Redux implements
         return new PracujNormalizer();
     }
 
-    public function handleResponse(Response $response) : Generator
+    public function filterOffersFromResponse(Response $response) : Generator
     {
-        $body = $response->getBody()->getContents();
+        $content = (string) $response->getBody();
 
-        $this->setInitialStateFromHtml($body);
+        $this->setInitialStateFromHtml($content);
 
         $initial_state = json_decode(substr($this->getInitialState(), 0, -3), true, 512, JSON_THROW_ON_ERROR);
 
@@ -211,18 +260,11 @@ class Pracuj extends Redux implements
         }
     }
 
-    /**
-     * Creates the query url for this website.
-     * @param  ?string $technology
-     * @param  ?string $city
-     * @param  ?string $exp
-     * @param  ?string $category
-     * @param  ?string $contract_type
-     * @param  ?int    $salary
-     * @return string                 The last portion of the url
-     */
-    private function createQueryUrl(?string $technology, ?string $city, ?string $exp, ?string $category, ?string $contract_type, ?int $salary) : string
+    public function createUrl($query) : string
     {
+        //sets up the variables https://www.php.net/manual/en/function.extract.php
+        extract($query);
+
         $first_part = (is_null($technology))? "" : "/$technology";
         $second_part = "";
 
@@ -231,12 +273,12 @@ class Pracuj extends Redux implements
         }
 
         $special_case_array = ["mid", "regular", "senior"];
-        $is_exp_null = is_null($exp);
-        $is_exp_in_special_case_array = in_array($exp, $special_case_array);
+        $is_exp_null = is_null($experience);
+        $is_exp_in_special_case_array = in_array($experience, $special_case_array);
 
         if (!$is_exp_null) {
             if (!$is_exp_in_special_case_array) {
-                $first_part .= "-x44-$exp;kw";
+                $first_part .= "-x44-$experience;kw";
             } elseif ($is_exp_in_special_case_array) {
                 $second_part .= "?et=4";
             }
@@ -273,7 +315,19 @@ class Pracuj extends Redux implements
             $url = $this->addGetVariableToUrl($url, "sal", $salary);
         }
 
-        return $url;
+        $this->currentQueryUrl = self::URL."/praca".$url;
+
+        $this->pageLimit = null;
+        $this->currentPage = null;
+
+
+        return self::URL."/praca".$url;
+    }
+
+    private function setPagination(array $body) : void
+    {
+        $this->currentPage = $body["pagination"]["currentPageNumber"];
+        $this->pageLimit = $body["pagination"]["maxPages"];
     }
 
     /**

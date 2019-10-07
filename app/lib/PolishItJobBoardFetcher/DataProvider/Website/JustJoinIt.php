@@ -209,7 +209,7 @@ class JustJoinIt implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL."api/offers");
+        $response = $client->request("GET", $this->createUrl($query));
 
         return $response;
     }
@@ -219,7 +219,7 @@ class JustJoinIt implements
         return new JustJoinItNormalizer();
     }
 
-    public function handleResponse(Response $response) : Generator
+    public function filterOffersFromResponse(Response $response) : Generator
     {
         if (empty($this->query)) {
             throw new EmptyQueryPropertyException("You need first too set the query property by using setQuery()");
@@ -255,5 +255,10 @@ class JustJoinIt implements
                 }
             }
         }
+    }
+
+    public function createUrl(array $query) : string
+    {
+        return self::URL."api/offers";
     }
 }

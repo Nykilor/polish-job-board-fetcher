@@ -2,7 +2,7 @@
 namespace PolishItJobBoardFetcher\DataProvider;
 
 /**
- * Interface for websites that need the query in the handleResponse method of WebsiteInterface
+ * Interface for websites that need the query in the filterOffersFromResponse method of WebsiteInterface
  */
 interface QueryClassPropertyInterface
 {

@@ -155,9 +155,9 @@ class Salary implements JsonSerializable
     {
         $valid_titles = ["month", "hour", "year"];
 
-        if (!in_array($title, $valid_titles)) {
+        if (!in_array($period, $valid_titles)) {
             $imploded_titles = implode(",", $valid_titles);
-            throw new \Exception("The period can only be: '$imploded_titles'", 1);
+            throw new \Exception("The period can't be '$period', allowed periods are: '$imploded_titles'", 1);
         }
 
         $this->period = $period;

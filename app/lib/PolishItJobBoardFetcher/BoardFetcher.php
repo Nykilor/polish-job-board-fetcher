@@ -1,9 +1,14 @@
 <?php
 namespace PolishItJobBoardFetcher;
 
+use Generator;
+
 use GuzzleHttp\Client;
 
+use GuzzleHttp\Psr7\Response;
+
 use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
+use PolishItJobBoardFetcher\DataProvider\PaginableWebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\QueryClassPropertyInterface;
 
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
@@ -65,17 +70,18 @@ class BoardFetcher
             }
         }
     }
-
-    public function fetch(bool $strict = false)
+    /**
+     * Initate the fetching of the data for setted websites by setted query
+     * @param  bool $yield_response If true the method will return an array where
+     * [PolishItJobBoardFetcher\DataProvider\Website\WebsiteInterface => GuzzleHttp\Psr7\Response]
+     * @param  bool $strict         If true the websites that f.i. don't allow a technology "php" will be omited
+     * @param  int $max_pages       If a websites chunks the results in pages we can set up the max amount of pages to fetch
+     * @return Generator|void
+     */
+    public function fetch(bool $yield_response = false, bool $strict = false, int $max_pages = 1)
     {
-        $is_websites_empty = empty($this->websites);
-        $is_query_creator_empty = empty($this->queryCreator);
-        if ($is_websites_empty or $is_query_creator_empty) {
-            $msg = "You need to call";
-            $msg .= ($is_websites_empty) ? " setWebsites()" : "";
-            $msg .= ($is_query_creator_empty) ? " setQuery()" : "";
-            throw new MissingClassPropertyException($msg);
-        }
+        //will throw exception if not
+        $this->isQueryAndWebsiteSet();
 
         foreach ($this->websites as $key => $class) {
             $class_instance = $class;
@@ -86,7 +92,8 @@ class BoardFetcher
                 //If any value in the query got null just go on to the next one
                 foreach ($this->queryCreator->query as $original_query_key => $original_query_value) {
                     if (array_key_exists($original_query_key, $query) && !is_null($original_query_value) && is_null($query[$original_query_key])) {
-                        continue;
+                        //https://www.php.net/manual/en/control-structures.break.php
+                        continue 2;
                     }
                 }
             } else {
@@ -98,18 +105,61 @@ class BoardFetcher
 
             $response = $class_instance->fetchOffers($this->client, $query);
 
+            if ($yield_response) {
+                yield [get_class($class_instance) => $response];
+            }
+
             $factory = new JobOfferFactory();
 
             if ($class_instance instanceof HasJobOfferNormalizerInterface) {
                 if ($class_instance instanceof QueryClassPropertyInterface) {
                     $class_instance->setQuery($query);
                 }
-                foreach ($class_instance->handleResponse($response) as $key => $entry_data) {
-                    $this->offers[] = $factory->createJobOfferModel($class_instance->getNormalizer(), $entry_data);
+
+                $this->createJobOffersFromResponse($class_instance, $response, $factory);
+
+                if ($class_instance instanceof PaginableWebsiteInterface) {
+                    $current_page = $class_instance->getCurrentPage();
+                    $limit = $class_instance->getPageLimit();
+
+                    if ($max_pages > 1 and $current_page !== $limit) {
+                        $fetch_page_limit = ($max_pages <= $limit) ? $max_pages : $limit;
+                        for ($page_to_fetch = $current_page + 1; $page_to_fetch <= $fetch_page_limit; $page_to_fetch++) {
+                            $response = $class_instance->fetchOffersPage($this->client, $page_to_fetch);
+
+                            if ($yield_response) {
+                                yield [get_class($class_instance) => $response];
+                            }
+
+                            $this->createJobOffersFromResponse($class_instance, $response, $factory);
+                        }
+                    }
                 }
             } else {
                 throw new ClassMissingInterfaceException("Missing PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface.", 1);
             }
+        }
+    }
+
+    private function createJobOffersFromResponse(WebsiteInterface $class_instance, Response $response, JobOfferFactory $factory) : void
+    {
+        $normalizer_instance = $class_instance->getNormalizer();
+
+        foreach ($class_instance->filterOffersFromResponse($response) as $key => $entry_data) {
+            $this->offers[] = $factory->createJobOfferModel($normalizer_instance, $entry_data);
+        }
+    }
+
+    protected function isQueryAndWebsiteSet() : void
+    {
+        $is_websites_empty = empty($this->websites);
+        $is_query_creator_empty = empty($this->queryCreator);
+
+        if ($is_websites_empty or $is_query_creator_empty) {
+            $msg = "You need to call";
+            $msg .= ($is_websites_empty) ? " setWebsites()" : "";
+            $msg .= ($is_query_creator_empty) ? " setQuery()" : "";
+            throw new MissingClassPropertyException($msg);
         }
     }
 }

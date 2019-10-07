@@ -85,7 +85,8 @@ class PracujNormalizer implements WebsiteOfferDataNormalizerInterface
         $array["salary"] = $salary;
 
         $array["url"] = $url_collection_model;
-        $array["contract_type"] = implode(",", $entry_data["typesOfContract"]);
+        $types_of_contract = implode(",", $entry_data["typesOfContract"]);
+        $array["contract_type"] = (empty($types_of_contract)) ? $entry_data["employmentForm"] : $types_of_contract;
 
         return $array;
     }

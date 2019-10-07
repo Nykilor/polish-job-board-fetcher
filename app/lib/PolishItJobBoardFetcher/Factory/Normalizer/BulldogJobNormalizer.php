@@ -57,9 +57,16 @@ class BulldogJobNormalizer implements WebsiteOfferDataNormalizerInterface
         $salary_object = null;
         if (!is_null($salary->getNode(0))) {
             $salary = trim($salary->text());
-            $salary = str_replace([' ', "PLN"], '', $salary);
-            $salary = explode("-", $salary);
             $salary_object = new Salary();
+
+            if (strpos($salary, "Do") === false) {
+                $salary = str_replace([' ', "PLN"], '', $salary);
+                $salary = explode("-", $salary);
+            } else {
+                $salary = str_replace(["Do", ' ', "PLN"], '', $salary);
+                $salary = [0, $salary];
+            }
+
             $salary_object->setFrom($salary[0]);
             $salary_object->setTo($salary[1]);
         }

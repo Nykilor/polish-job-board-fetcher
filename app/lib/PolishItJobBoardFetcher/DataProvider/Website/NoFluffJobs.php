@@ -205,7 +205,7 @@ class NoFluffJobs implements
           "json" => $this->getRequestBody($query["technology"], $city, $query["experience"], $query["category"], $query["salary"])
         ];
 
-        $response = $client->request("POST", self::URL."api/search/posting", $options);
+        $response = $client->request("POST", $this->createUrl($query), $options);
 
         return $response;
     }
@@ -215,13 +215,18 @@ class NoFluffJobs implements
         return new NoFluffJobsNormalizer();
     }
 
-    public function handleResponse(Response $response) : Generator
+    public function filterOffersFromResponse(Response $response) : Generator
     {
         $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
         foreach ($body["postings"] as $key => $entry_data) {
             yield $entry_data;
         }
+    }
+
+    public function createUrl(array $query) : string
+    {
+        return self::URL."api/search/posting";
     }
 
     /**

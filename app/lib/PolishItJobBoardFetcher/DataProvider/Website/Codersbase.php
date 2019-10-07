@@ -216,7 +216,7 @@ class Codersbase extends Redux implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", self::URL);
+        $response = $client->request("GET", $this->createUrl($query));
 
         return $response;
     }
@@ -226,7 +226,7 @@ class Codersbase extends Redux implements
         return new CodersbaseNormalizer();
     }
 
-    public function handleResponse(Response $response) : Generator
+    public function filterOffersFromResponse(Response $response) : Generator
     {
         if (empty($this->query)) {
             throw new EmptyQueryPropertyException("You need first too set the query property by using setQuery()");
@@ -249,6 +249,11 @@ class Codersbase extends Redux implements
                 yield $filtered_offer;
             }
         }
+    }
+
+    public function createUrl(array $query) : string
+    {
+        return self::URL;
     }
 
     /**

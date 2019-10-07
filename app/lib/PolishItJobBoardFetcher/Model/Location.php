@@ -21,7 +21,7 @@ class Location implements JsonSerializable
     /**
      * @var string
      */
-    private $longitude = false;
+    private $longitude = null;
 
     public function jsonSerialize() : array
     {
