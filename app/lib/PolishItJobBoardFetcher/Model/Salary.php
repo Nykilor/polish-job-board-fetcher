@@ -51,7 +51,7 @@ class Salary implements JsonSerializable
     /**
      * Set the value of From
      *
-     * @param int|null from
+     * @param int|null $from
      *
      * @return self
      */
@@ -75,7 +75,7 @@ class Salary implements JsonSerializable
     /**
      * Set the value of To
      *
-     * @param int|null to
+     * @param int|null $to
      *
      * @return self
      */
@@ -99,7 +99,7 @@ class Salary implements JsonSerializable
     /**
      * Set the value of Gross
      *
-     * @param bool|null gross
+     * @param bool|null $gross
      *
      * @return self
      */
@@ -123,7 +123,7 @@ class Salary implements JsonSerializable
     /**
      * Set the value of Currency
      *
-     * @param string currency
+     * @param string $currency
      *
      * @return self
      */
@@ -147,7 +147,7 @@ class Salary implements JsonSerializable
     /**
      * Set the value of Period
      *
-     * @param string period
+     * @param string $period
      *
      * @return self
      */

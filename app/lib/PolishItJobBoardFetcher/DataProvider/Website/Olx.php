@@ -80,7 +80,8 @@ class Olx implements
 
     private $contractType = [
       "part" => [
-        "permanent"
+        "permanent",
+        "uop"
       ],
       "contract" => [
         "contract_work"

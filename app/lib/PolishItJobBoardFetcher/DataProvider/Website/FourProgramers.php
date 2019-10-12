@@ -15,25 +15,23 @@ use PolishItJobBoardFetcher\DataProvider\Fields\ExperienceQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\TechnologyQueryFieldInterface;
 use PolishItJobBoardFetcher\DataProvider\Fields\ContractTypeQueryFieldInterface;
 
+use PolishItJobBoardFetcher\DataProvider\WebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\PaginableWebsiteInterface;
 use PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface;
 
-use PolishItJobBoardFetcher\DataProvider\WebsiteType\Redux;
-
 use PolishItJobBoardFetcher\Exception\PageLimitExcededException;
 
-use PolishItJobBoardFetcher\Factory\Normalizer\PracujNormalizer;
+use PolishItJobBoardFetcher\Factory\Normalizer\FourProgramersNormalizer;
 
 use PolishItJobBoardFetcher\Factory\WebsiteOfferDataNormalizerInterface;
 
-use PolishItJobBoardFetcher\Utility\AddGetVariableToUrlTrait;
-use PolishItJobBoardFetcher\Utility\ReplacePolishLettersTrait;
 use PolishItJobBoardFetcher\Utility\WebsiteInterfaceHelperTrait;
 
 /**
- * Pracuj.pl webstie redux scrapping class
+ * JustJoin.it API call class
  */
-class Pracuj extends Redux implements
+class FourProgramers implements
+    WebsiteInterface,
     HasJobOfferNormalizerInterface,
     CategoryQueryFieldInterface,
     CityQueryFieldInterface,
@@ -43,40 +41,34 @@ class Pracuj extends Redux implements
     SalaryQueryFieldInterface,
     PaginableWebsiteInterface
 {
-    use ReplacePolishLettersTrait;
     use WebsiteInterfaceHelperTrait;
-    use AddGetVariableToUrlTrait;
 
-    public const URL = "https://www.pracuj.pl";
+    public const URL = "https://4programmers.net/";
 
-    private $technology = [];
-
-    private $city = [];
-
-    private $category = [
-      "5015" => [
-        "devops", "analyst", "analityk",
-        "administrator", "support", "wsparcie",
-        "project_manager", "pm", "project manager",
-        "project-manager", "testing", "test",
-        "tester", "testers", "tech_lead",
-        "tl", "team leader", "tech lead",
-        "scrum_master", "scrum", "sm",
-        "agile coach",
+    private $technology = [
+      "javascript" => [
+        "js"
       ],
-      "5016" => [
-        "backend", "fullstack", "frontend",
-        "architect", "qa", "mobile",
-        "embedded",
-      ],
-      "5026" => [
-        "designer", "ux/ui", "design",
-        "ux", "ui"
-      ]
+      "java", "php", "c#",
+      "python", "c++", "c",
+      "ruby", "scala", "swift",
+      "perl", "go"
     ];
+
+    private $city = [
+      "warszawa", "kraków", "poznań",
+      "katowice", "wrocław", "gliwice",
+      "bielsko-biała", "lublin", "warsaw",
+      "białystok", "remote"
+    ];
+
+    private $category = [];
 
     private $experience = [
         "junior",
+        "mid" => [
+          "regular", "medium"
+        ],
         "senior" => [
           "specjalista",
           "specialist"
@@ -84,18 +76,9 @@ class Pracuj extends Redux implements
     ];
 
     private $contractType = [
-      "0" => [
-        "permanent",
-        "uop"
-      ],
-      "1" => [
-        "contract_work"
-      ],
-      "2" => [
-        "mandate_contract"
-      ],
-      "3" => [
-        "b2b"
+      "b2b",
+      "uop" => [
+        "permanent"
       ]
     ];
 
@@ -154,7 +137,7 @@ class Pracuj extends Redux implements
 
     public function hasTechnology(?string $technology) : bool
     {
-        return false;
+        return $this->arrayContains($this->technology, $technology);
     }
 
     public function allowsCustomTechnology() : bool
@@ -174,7 +157,11 @@ class Pracuj extends Redux implements
 
     public function hasCity(?string $city) : bool
     {
-        return false;
+        if (!is_null($city) && in_array(strtolower($city), $this->city)) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public function allowsCustomCity() : bool
@@ -214,15 +201,17 @@ class Pracuj extends Redux implements
 
     public function fetchOffers(Client $client, array $query) : Response
     {
-        $response = $client->request("GET", $this->createUrl($query));
+        $response = $client->request("GET", $this->createUrl($query), [
+          "headers" => [
+            "accept" => "application/json"
+          ]
+        ]);
 
         $body = $response->getBody();
 
         $content = (string) $body;
 
-        $this->setInitialStateFromHtml($content);
-
-        $this->setPagination(json_decode(substr($this->getInitialState(), 0, -3), true, 512, JSON_THROW_ON_ERROR));
+        $this->setPagination(json_decode($content, true, 512, JSON_THROW_ON_ERROR));
 
         //reset the stream pointer position
         $body->rewind();
@@ -238,98 +227,94 @@ class Pracuj extends Redux implements
 
         $this->currentPage = $page;
 
-        $current_query_url = $this->addGetVariableToUrl($this->currentQueryUrl, "pn", $page);
+        $current_query_url = $this->currentQueryUrl."&page=".$page;
 
-        $response = $client->request("GET", $current_query_url);
+        $response = $client->request("GET", $current_query_url, [
+          "headers" => [
+            "accept" => "application/json"
+          ]
+        ]);
 
         return $response;
     }
 
     public function getNormalizer() : WebsiteOfferDataNormalizerInterface
     {
-        return new PracujNormalizer();
+        return new FourProgramersNormalizer();
     }
 
     public function filterOffersFromResponse(Response $response) : Generator
     {
-        $content = (string) $response->getBody();
+        $body = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
 
-        $this->setInitialStateFromHtml($content);
-
-        $initial_state = json_decode(substr($this->getInitialState(), 0, -3), true, 512, JSON_THROW_ON_ERROR);
-
-        foreach ($initial_state["offers"] as $key => $offer) {
-            yield $offer;
+        foreach ($body["jobs"]["data"] as $key => $offer_array) {
+            yield $offer_array;
         }
     }
 
-    public function createUrl($query) : string
+    public function createUrl(array $query) : string
     {
-        //sets up the variables https://www.php.net/manual/en/function.extract.php
         extract($query);
 
-        $first_part = (is_null($technology))? "" : "/$technology";
-        $second_part = "";
+        $url = [
+          "q" => null,
+          "city" => null,
+          "tags" => [],
+          "salary" => null,
+          "locations" => [],
+          "json" => 1
+        ];
+        $q = [];
 
-        if (!is_null($city)) {
-            $second_part = "/".strtolower($this->replacePolishLetters($city)).";wp";
+        if (!is_null($experience)) {
+            $q[] = $experience;
         }
 
-        $special_case_array = ["mid", "regular", "senior"];
-        $is_exp_null = is_null($experience);
-        $is_exp_in_special_case_array = in_array($experience, $special_case_array);
-
-        if (!$is_exp_null) {
-            if (!$is_exp_in_special_case_array) {
-                $first_part .= "-x44-$experience;kw";
-            } elseif ($is_exp_in_special_case_array) {
-                $second_part .= "?et=4";
+        if (!is_null($technology)) {
+            if ($this->hasTechnology($technology)) {
+                $url["tags"][] = $technology;
+            } else {
+                $q[] = $technology;
             }
         }
 
-        if (!empty($first_part) && strpos($first_part, ";kw") === false) {
-            $first_part .= ";kw";
-        }
-
-        $url = "";
-
-        if (!empty($first_part)) {
-            $url .= $first_part;
-        }
-
-        if (!empty($second_part)) {
-            $url .= $second_part;
-        }
-
-        //Categories specification IT - administration, programing, design
-        if (is_null($category)) {
-            $category_string = "5015%2c5016%2c5026";
-        } else {
-            $category_string = $category;
-        }
-
-        $url = $this->addGetVariableToUrl($url, "cc", $category_string);
-
-        if (!is_null($contract_type)) {
-            $url = $this->addGetVariableToUrl($url, "tc", $contract_type);
+        if (!is_null($city)) {
+            if ($this->hasCity($city)) {
+                if ($city !== "remote") {
+                    $url["locations"][] = $city;
+                } else {
+                    $url["remote"] = 1;
+                    $url["remote_range"] = 100;
+                }
+            } else {
+                $url["city"] = $city;
+            }
         }
 
         if (!is_null($salary)) {
-            $url = $this->addGetVariableToUrl($url, "sal", $salary);
+            $url["salary"] = $salary;
         }
 
-        $this->currentQueryUrl = self::URL."/praca".$url;
+        if (!is_null($contract_type)) {
+            $q[] = $contract_type;
+        }
 
-        $this->pageLimit = null;
-        $this->currentPage = null;
+        if (!empty($q)) {
+            $url["q"] = implode(" ", $q);
+        }
 
+        $url = array_filter($url);
 
-        return self::URL."/praca".$url;
+        $get = http_build_query($url);
+
+        $this->currentQueryUrl = self::URL."Praca?".$get;
+
+        return $this->currentQueryUrl;
     }
 
     private function setPagination(array $body) : void
     {
-        $this->currentPage = $body["pagination"]["currentPageNumber"];
-        $this->pageLimit = $body["pagination"]["maxPages"];
+        $this->currentPage = $body["jobs"]["meta"]["current_page"];
+        $this->pageLimit = $body["jobs"]["meta"]["last_page"];
     }
 }

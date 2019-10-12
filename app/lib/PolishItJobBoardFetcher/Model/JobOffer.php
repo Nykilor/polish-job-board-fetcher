@@ -68,7 +68,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Title
      *
-     * @param string title
+     * @param string $title
      *
      * @return self
      */
@@ -92,7 +92,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Exp
      *
-     * @param string|null exp
+     * @param string|null $exp
      *
      * @return self
      */
@@ -116,7 +116,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Technology
      *
-     * @param array technology
+     * @param array $technology
      *
      * @return self
      */
@@ -140,7 +140,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Url
      *
-     * @param UrlCollection url
+     * @param UrlCollection $url
      *
      * @return self
      */
@@ -164,7 +164,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Post Time
      *
-     * @param \DateTime postTime
+     * @param \DateTime $postTime
      *
      * @return self
      */
@@ -188,7 +188,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Company
      *
-     * @param string company
+     * @param string $company
      *
      * @return self
      */
@@ -212,7 +212,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Salary
      *
-     * @param Salary|null salary
+     * @param Salary|null $salary
      *
      * @return self
      */
@@ -236,7 +236,7 @@ class JobOffer implements JsonSerializable
     /**
      * Set the value of Contract Type
      *
-     * @param string|null contractType
+     * @param string|null $contractType
      *
      * @return self
      */

@@ -95,7 +95,9 @@ class JustJoinIt implements
 
     private $contractType = [
       "b2b",
-      "permanent",
+      "permanent" => [
+        "uop"
+      ],
       "mandate_contract"
     ];
 

@@ -109,7 +109,9 @@ class Codersbase extends Redux implements
 
     private $contractType = [
       "b2b",
-      "permanent",
+      "permanent" => [
+        "uop"
+      ]
     ];
 
     private $salary = [];
@@ -233,7 +235,6 @@ class Codersbase extends Redux implements
         }
 
         $body = $response->getBody()->getContents();
-        //todo
         $this->setInitialStateFromHtml($body);
         //remove slashes
         $initial_state = preg_replace(['/\\\\/'], "", $this->getInitialState());
@@ -283,7 +284,10 @@ class Codersbase extends Redux implements
         if (empty($city[0]) or in_array(strtolower($offer_array["officeCity"]), $city) or ($city[0] === "remote" && $offer_array["fullRemote"])) {
             if (is_null($this->query["experience"]) or $this->query["experience"] === strtolower($offer_array["experienceLevel"])) {
                 if (empty($look_for_in_main_skill) or in_array(strtolower($offer_array["mainSkill"]), $look_for_in_main_skill)) {
-                    if (is_null($this->query["contract_type"]) or $this->query["contract_type"] === strtolower($offer_array["employmentType"]) or $offer_array["employmentType"] === "both") {
+                    if (is_null($this->query["contract_type"]) or
+                        $this->query["contract_type"] === strtolower($offer_array["employmentType"]) or
+                        $offer_array["employmentType"] === "both"
+                      ) {
                         if (is_null($this->query["salary"]) or
                             (isset($offer_array["salaryFrom"]) and $this->query["salary"] <= intval($offer_array["salaryFrom"])) or
                             (isset($offer_array["salaryTo"]) and $this->query["salary"] <= intval($offer_array["salaryTo"]))

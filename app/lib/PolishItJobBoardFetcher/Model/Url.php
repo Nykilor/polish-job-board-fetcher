@@ -40,9 +40,9 @@ class Url implements JsonSerializable
     /**
      * Get the value of The url adress;
      *
-     * @return string
+     * @return string|null
      */
-    public function getUrl()
+    public function getUrl() : ?string
     {
         return $this->url;
     }
@@ -50,11 +50,11 @@ class Url implements JsonSerializable
     /**
      * Set the value of The url adress;
      *
-     * @param string url
+     * @param string|null $url
      *
      * @return self
      */
-    public function setUrl(string $url)
+    public function setUrl(?string $url)
     {
         $this->url = $url;
 
@@ -74,7 +74,7 @@ class Url implements JsonSerializable
     /**
      * Set the value of The title of the url.
      *
-     * @param string title
+     * @param string $title
      *
      * @return self
      */
@@ -107,7 +107,7 @@ class Url implements JsonSerializable
     /**
      * Set the value of The city that the url refers too
      *
-     * @param Location|null location
+     * @param LocationCollection|null $location
      *
      * @return self
      */

@@ -41,7 +41,7 @@ class Location implements JsonSerializable
     /**
      * Set the value of Adress
      *
-     * @param string|null adress
+     * @param string|null $adress
      *
      * @return self
      */
@@ -65,7 +65,7 @@ class Location implements JsonSerializable
     /**
      * Set the value of Latitude
      *
-     * @param string|null latitude
+     * @param string|null $latitude
      *
      * @return self
      */
@@ -89,7 +89,7 @@ class Location implements JsonSerializable
     /**
      * Set the value of Longitude
      *
-     * @param string|null longitude
+     * @param string|null $longitude
      *
      * @return self
      */
