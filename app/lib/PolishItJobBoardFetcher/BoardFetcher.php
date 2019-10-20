@@ -43,17 +43,27 @@ class BoardFetcher
         $this->offers = new JobOfferCollection();
     }
 
-
+    /**
+     * @return JobOfferCollection Curently fetched data storage.
+     */
     public function getJobOffersCollection() : JobOfferCollection
     {
         return $this->offers;
     }
 
+    /**
+     * Sets the query to fetch/filter by.
+     * @param array $query
+     */
     public function setQuery(array $query)
     {
         $this->queryCreator = new WebsiteQueryCreator($query);
     }
 
+    /**
+     * Set the websites to get data from.
+     * @param array $websites
+     */
     public function setWebsites(array $websites)
     {
         foreach ($websites as $key => $website) {
@@ -70,6 +80,7 @@ class BoardFetcher
             }
         }
     }
+
     /**
      * Initate the fetching of the data for setted websites by setted query
      * @param  bool $yield_response If true the method will return an array where
@@ -119,21 +130,13 @@ class BoardFetcher
                 $this->createJobOffersFromResponse($class_instance, $response, $factory);
 
                 if ($class_instance instanceof PaginableWebsiteInterface) {
-                    $current_page = $class_instance->getCurrentPage();
-                    $limit = $class_instance->getPageLimit();
+                    $next_page_response = $this->fetchNextPage($class_instance, $max_pages);
 
-                    if ($max_pages > 1 and $current_page !== $limit) {
-                        $fetch_page_limit = ($max_pages <= $limit) ? $max_pages : $limit;
-                        for ($page_to_fetch = $current_page + 1; $page_to_fetch <= $fetch_page_limit; $page_to_fetch++) {
-                            $response = $class_instance->fetchOffersPage($this->client, $page_to_fetch);
-
-                            if ($yield_response) {
-                                yield [get_class($class_instance) => $response];
-                            }
-
-                            $this->createJobOffersFromResponse($class_instance, $response, $factory);
-                        }
+                    if ($yield_response) {
+                        yield [get_class($class_instance) => $next_page_response];
                     }
+
+                    $this->createJobOffersFromResponse($class_instance, $next_page_response, $factory);
                 }
             } else {
                 throw new ClassMissingInterfaceException("Missing PolishItJobBoardFetcher\DataProvider\HasJobOfferNormalizerInterface.", 1);
@@ -141,6 +144,12 @@ class BoardFetcher
         }
     }
 
+    /**
+     * Uses the given $class_instance's method to filter the data and create a JobOffer from it.
+     * @param WebsiteInterface $class_instance The website instance.
+     * @param Response         $response       The response from the website.
+     * @param JobOfferFactory  $factory
+     */
     private function createJobOffersFromResponse(WebsiteInterface $class_instance, Response $response, JobOfferFactory $factory) : void
     {
         $normalizer_instance = $class_instance->getNormalizer();
@@ -150,6 +159,30 @@ class BoardFetcher
         }
     }
 
+    /**
+     * Fetches the pages of given website untill the $max_pages limit is meet or there's no more pages.
+     * @param  PaginableWebsiteInterface $class_instance
+     * @param  int                       $max_pages      Max amout of pages.
+     * @return Generator                                 Returns the GuzzleHttp\Psr7\Response
+     */
+    private function fetchNextPage(PaginableWebsiteInterface $class_instance, int $max_pages) : Generator
+    {
+        $current_page = $class_instance->getCurrentPage();
+        $limit = $class_instance->getPageLimit();
+
+        if ($max_pages > 1 and $current_page !== $limit) {
+            $fetch_page_limit = ($max_pages <= $limit) ? $max_pages : $limit;
+            for ($page_to_fetch = $current_page + 1; $page_to_fetch <= $fetch_page_limit; $page_to_fetch++) {
+                $response = $class_instance->fetchOffersPage($this->client, $page_to_fetch);
+
+                yield $response;
+            }
+        }
+    }
+
+    /**
+     * Method that checks if the query and website property of this class is set.
+     */
     protected function isQueryAndWebsiteSet() : void
     {
         $is_websites_empty = empty($this->websites);
